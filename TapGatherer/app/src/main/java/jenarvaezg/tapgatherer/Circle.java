@@ -20,25 +20,34 @@ class Circle {
     private Integer minRadiusFraction = 20;
     private Integer maxRadiusFraction = 10;
 
+
+
     Circle(Canvas c){
         Point size = new Point(c.getWidth(), c.getHeight());
         Random random = new Random(System.currentTimeMillis());
-        this.x = random.nextFloat() * (size.x);
-        this.y = random.nextFloat() * (size.y);
         //Area = pi * r^2
         //r = sqrt(Area/pi)
         Integer canvasArea = size.x * size.y;
         Double equivalentAreaRadius = Math.sqrt(canvasArea / Math.PI);
         Double minRadius = equivalentAreaRadius / minRadiusFraction;
         Double maxRadius = equivalentAreaRadius / maxRadiusFraction;
-
         this.r = (float) (random.nextFloat() * (maxRadius - minRadius) + minRadius);
+
+        //don't want circle to have parts outside canvas
+        this.x = random.nextFloat() * (size.x - r) + r;
+        this.y = random.nextFloat() * (size.y - r) + r;
+
         paint = new Paint();
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.argb(255, random.nextInt(255), random.nextInt(255), random.nextInt(255)));
+
     }
 
     void draw(Canvas c){
+        Paint borderPaint = new Paint();
+        borderPaint.setStyle(Paint.Style.FILL);
+        borderPaint.setColor(Color.WHITE);
+        c.drawCircle(x, y, r+5, borderPaint);
         c.drawCircle(x, y, r, paint);
     }
 

@@ -30,50 +30,24 @@ public class SensorGatherService extends IntentService implements SensorEventLis
     protected static final String ACTION_START = "START";
     protected static final String ACTION_UPDATE = "UPDATE";
 
-    private static SensorManager mSensorManager;
-    private static Sensor mAccelerometer;
-    private static Sensor mGyroscope;
+    private  SensorManager mSensorManager;
+    private  Sensor mAccelerometer;
+    private  Sensor mGyroscope;
+    private  Sensor mRotationVector;
 
-    private static boolean canWrite = true;
     private static PointF target = new PointF(0,0);
 
 
     @Override
-    public void onCreate(){
-        super.onCreate();
-        mSensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
-        mAccelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-        mGyroscope = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
-        try {
-            File f = getExternalFilesDir(null);
-            if (f == null || !f.mkdirs()){
-                throw new IOException("ExternalFilesDir error");
-            }
-            csvStream = new DataOutputStream(new BufferedOutputStream(
-                    new FileOutputStream(f.getAbsolutePath() + "/test.csv")));
-            csvStream.writeUTF("sensorType,timestamp,sensorX,sensorY,sensorZ,targetX,targetY\n");
-        } catch (IOException e) {
-            canWrite = false;
-            e.printStackTrace();
-        }
-    }
-
-
-    @Override
     protected void onHandleIntent(Intent intent) {
-        if (!canWrite){
-            stopSelf();
-            return;
-        }
         if (intent != null) {
             final String action = intent.getAction();
-            Log.d(TAG+"A", "GOT ACTION " + action);
+            Log.d(TAG, "GOT ACTION " + action);
             if (ACTION_START.equals(action)) {
                 Log.d(TAG, "Go!");
                 gatherFromSensors();
             }else if(ACTION_UPDATE.equals(action)) {
-
-                target = new PointF(intent.getFloatExtra("X", -1), intent.getFloatExtra("Y", -1));
+                target = new PointF(intent.getFloatExtra("X", -1.0f), intent.getFloatExtra("Y", -1.0f));
                 Log.d(TAG+"A", "UPDATING!! " + target.toString());
             }else{
                 Log.wtf(TAG, "DUDE WHAT");
@@ -82,45 +56,49 @@ public class SensorGatherService extends IntentService implements SensorEventLis
     }
 
     private void gatherFromSensors(){
+        try {
+
+            //assume we have external storage, fail miserably otherwise
+            File f = getExternalFilesDir(null);
+
+            if (f == null){
+                throw new IOException("ExternalFilesDir error");
+            }
+            if (!f.mkdirs()){
+                Log.d(TAG, f.getAbsolutePath() + " not created");
+            }
+            Log.d(TAG, f.getCanonicalPath());
+            csvStream = new DataOutputStream(new BufferedOutputStream(
+                    new FileOutputStream(f.getAbsolutePath() + "/test.csv")));
+            csvStream.writeChars("sensorType,timestamp,value0,value1,value2,value3,value4,targetX,targetY\n");
+        } catch (IOException e) {
+            Log.e(TAG, Log.getStackTraceString(e));
+            return;
+        }
+
+        mSensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+
+        mAccelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        mRotationVector = mSensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
+        mGyroscope = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
         mSensorManager.registerListener(this, mAccelerometer, SensorManager.SENSOR_DELAY_NORMAL);
         mSensorManager.registerListener(this, mGyroscope, SensorManager.SENSOR_DELAY_NORMAL);
+        mSensorManager.registerListener(this, mRotationVector, SensorManager.SENSOR_DELAY_NORMAL);
     }
 
-    int prevSensor = Sensor.TYPE_ACCELEROMETER;
-    long prevTimestamp = 0;
-    int sameCtr = 0;
-    int diffCtr = 0;
-    int accCtr = 0;
-    int gyroCtr = 0;
+
     @Override
     public void onSensorChanged(SensorEvent event) {
-        switch(event.sensor.getType()){
-            case Sensor.TYPE_GYROSCOPE:
-                Log.d(TAG, "Gyroscope: " + Long.toString(event.timestamp));
-                gyroCtr++;
-                break;
-            case Sensor.TYPE_ACCELEROMETER:
-                Log.d(TAG, "Accelerometer: " + Long.toString(event.timestamp));
-                accCtr++;
-        }
-        if (prevSensor == event.sensor.getType()){
-            Log.d(TAG, "Same sensor, timestamp delta: " + Long.toString(event.timestamp - prevTimestamp));
-            sameCtr++;
-        }else{
-            Log.d(TAG, "Different sensor, timestamp delta: " + Long.toString(event.timestamp - prevTimestamp));
-            diffCtr++;
-            prevSensor = event.sensor.getType();
-        }
-        prevTimestamp = event.timestamp;
-
-        Log.d(TAG, "acc: " + Integer.toString(accCtr) + ", gyro: " + Integer.toString(gyroCtr) +
-        ", diff: " + Integer.toString(diffCtr) + ", same: " + Integer.toString(sameCtr));
+        float[] values = new float[5];
+        //this way we can use 3d sensors and quaternions
+        System.arraycopy(event.values, 0, values, 0, event.values.length);
 
         try {
-            csvStream.write((Integer.toString(event.sensor.getType()) + "," + Long.toString(event.timestamp) + "," +
-                    Float.toString(event.values[0]) +
-                "," + Float.toString(event.values[1]) + "," + Float.toString(event.values[1]) +
-                    "," + Float.toString(target.x) + "," + Float.toString(target.y) + "\n").getBytes());
+            csvStream.writeChars(Integer.toString(event.sensor.getType()) + "," +
+                    Long.toString(event.timestamp) + "," + Float.toString(values[0]) +
+                    "," + Float.toString(values[1]) + "," + Float.toString(values[2]) +
+                    "," + Float.toString(values[3]) + "," + Float.toString(values[4]) +
+                    "," + Float.toString(target.x) + "," + Float.toString(target.y) + "\n");
             Log.d(TAG, "Writing! " + Long.toString(event.timestamp) + target.toString());
             csvStream.flush();
         } catch (IOException e) {
@@ -129,7 +107,5 @@ public class SensorGatherService extends IntentService implements SensorEventLis
     }
 
     @Override
-    public void onAccuracyChanged(Sensor sensor, int accuracy) {
-        Log.d(TAG, "ACCuracy changed! " + Integer.toString(accuracy));
-    }
+    public void onAccuracyChanged(Sensor sensor, int accuracy) { }
 }
