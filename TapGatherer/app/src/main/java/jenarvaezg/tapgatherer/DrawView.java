@@ -57,7 +57,7 @@ public class DrawView extends SurfaceView implements SurfaceHolder.Callback {
         if (canvas == null) {
             return;
         }
-        drawAxis(canvas);
+        drawGrid(canvas);
         if (currentCircle == null){
             currentCircle = new Circle(canvas);
         }
@@ -65,7 +65,7 @@ public class DrawView extends SurfaceView implements SurfaceHolder.Callback {
         holder.unlockCanvasAndPost(canvas);
     }
 
-    private void drawAxis(Canvas canvas){
+    private void drawGrid(Canvas canvas){
         Point size = new Point(canvas.getWidth(), canvas.getHeight());
         canvas.drawLine(0, size.y/2, size.x, size.y/2, axisPaint);
         canvas.drawLine(size.x/2, 0, size.x/2, size.y, axisPaint);
@@ -75,7 +75,7 @@ public class DrawView extends SurfaceView implements SurfaceHolder.Callback {
         SurfaceHolder holder = this.getHolder();
         Canvas canvas = holder.lockCanvas();
         canvas.drawColor(Color.BLACK);
-        drawAxis(canvas);
+        drawGrid(canvas);
         currentCircle = new Circle(canvas);
         currentCircle.draw(canvas);
         holder.unlockCanvasAndPost(canvas);

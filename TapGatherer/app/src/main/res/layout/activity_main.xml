@@ -5,15 +5,28 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <TextView
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:id="@+id/drawViewText"
-        android:textAlignment="center"/>
+        android:id="@+id/topLayout">
+        <TextView
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:id="@+id/drawViewText"
+            android:textAlignment="center"/>
+        <Button
+            android:layout_height="wrap_content"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:text="@string/start"/>
+    </LinearLayout>
+
+
     <jenarvaezg.tapgatherer.DrawView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@id/drawViewText"
+        android:layout_below="@id/topLayout"
         android:id="@+id/drawView"/>
 
 </RelativeLayout>
