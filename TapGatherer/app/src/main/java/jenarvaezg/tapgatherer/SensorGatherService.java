@@ -7,7 +7,9 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.os.Bundle;
 import android.util.Log;
+import android.view.MotionEvent;
 
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
@@ -15,7 +17,10 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.text.DateFormat;
+import java.util.Collection;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 
 
 public class SensorGatherService extends IntentService implements SensorEventListener {
@@ -32,13 +37,23 @@ public class SensorGatherService extends IntentService implements SensorEventLis
     protected static final String ACTION_START = "START";
     protected static final String ACTION_UPDATE = "UPDATE";
     protected static final String ACTION_STOP = "STOP";
+    protected static final String ACTION_STORE_TOUCH_EVENT = "STORE";
 
     private  SensorManager mSensorManager;
 
+    private static EventStack eventStack;
 
-    private static PointF target = new PointF(0,0);
+    static Map<Integer, TimeBase> sensorOffsets = new HashMap<>();
 
-    private EventStack eventStack;
+    class TimeBase{
+        Long dateBase;
+        Long timestampBase;
+
+        TimeBase(Long dateBase, Long timeStampBase){
+            this.dateBase = dateBase;
+            this.timestampBase = timeStampBase;
+        }
+    }
 
 
     @Override
@@ -49,12 +64,13 @@ public class SensorGatherService extends IntentService implements SensorEventLis
             if (ACTION_START.equals(action)) {
                 Log.d(TAG, "Go!");
                 startSensors();
-            }else if(ACTION_UPDATE.equals(action)) {
-                target = new PointF(intent.getFloatExtra("X", -1.0f), intent.getFloatExtra("Y", -1.0f));
+            }else if(ACTION_STORE_TOUCH_EVENT.equals(action)){
+                Bundle bundle = intent.getExtras();
+                storeTouchEvent(bundle);
             }else if(ACTION_STOP.equals(action)) {
                 stopSensors();
             }else{
-                Log.wtf(TAG, "DUDE WHAT");
+                Log.wtf(TAG, "DUDE WHAT '" + action + "'");
             }
         }
     }
@@ -77,21 +93,24 @@ public class SensorGatherService extends IntentService implements SensorEventLis
             Log.d(TAG, dateString);
             csvStream = new DataOutputStream(new BufferedOutputStream(
                     new FileOutputStream(f.getAbsolutePath() + "/"+dateString+".csv")));
-            csvStream.writeChars("sensorType,timestamp,value0,value1,value2,value3,value4,targetX,targetY\n");
+            csvStream.writeChars("timestamp,sensor,value0,value1,value2,value3,value4,when,type,action\n");
         } catch (IOException e) {
             Log.e(TAG, Log.getStackTraceString(e));
             return;
         }
+
+        eventStack = new EventStack();
 
         mSensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
 
         Sensor mAccelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         Sensor mRotationVector = mSensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
         Sensor mGyroscope = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
-        mSensorManager.registerListener(this, mAccelerometer, SensorManager.SENSOR_DELAY_NORMAL);
-        mSensorManager.registerListener(this, mGyroscope, SensorManager.SENSOR_DELAY_NORMAL);
-        mSensorManager.registerListener(this, mRotationVector, SensorManager.SENSOR_DELAY_NORMAL);
-        eventStack = new EventStack();
+        Sensor mGameRotationVector = mSensorManager.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR);
+        mSensorManager.registerListener(this, mAccelerometer, SensorManager.SENSOR_DELAY_FASTEST);
+        mSensorManager.registerListener(this, mGyroscope, SensorManager.SENSOR_DELAY_FASTEST);
+        mSensorManager.registerListener(this, mRotationVector, SensorManager.SENSOR_DELAY_FASTEST);
+        mSensorManager.registerListener(this, mGameRotationVector, SensorManager.SENSOR_DELAY_FASTEST);
     }
 
     private void stopSensors(){
@@ -99,77 +118,85 @@ public class SensorGatherService extends IntentService implements SensorEventLis
     }
 
 
+
+    /*The timestamps are not defined as being the Unix time;
+    they're just "a time" that's only valid for a given sensor.
+     This means that timestamps can only be compared if they come from the same sensor.
+     Oh boi*/
+
     @Override
     public void onSensorChanged(SensorEvent event) {
-        eventStack.put(event.timestamp, event);
+        TimeBase offset = sensorOffsets.get(event.sensor.getType());
+        if(offset == null){
+            offset = new TimeBase(System.currentTimeMillis(), event.timestamp);
+            sensorOffsets.put(event.sensor.getType(), offset);
+        }
+        synchronized (EventStack.class) {
+            eventStack.put((event.timestamp - offset.timestampBase) / 1000000L + offset.dateBase,
+                    new SensorEventData(event, offset));
+        }
     }
-        //float[] values = new float[5];
-        /*if (event.sensor.getType() == Sensor.TYPE_ROTATION_VECTOR ||
-                event.sensor.getType() == Sensor.TYPE_GAME_ROTATION_VECTOR ){
-            values = quaternionToEuler(event.values);
-        }else{
-            values = event.values;
-        }*/
 
-        //this way we can use 3d sensors and quaternions
-        /*System.arraycopy(event.values, 0, values, 0, event.values.length);
-
-        StringBuilder sb = new StringBuilder();
-        sb.append(event.sensor.getType()).append(",");
-        sb.append(event.timestamp).append(",");
-        for(float value : values){
-            sb.append(value).append(",");
-        }
-        sb.append(target.x).append(",").append(target.y).append("\n");
-        try {
-            csvStream.writeChars(sb.toString());
-        } catch (IOException e) {
-            e.printStackTrace();
-            Log.e(TAG, Log.getStackTraceString(e));
-        }
-        Log.d(TAG, "Writing!:  " + sb.toString());*/
 
     @Override
     public void onAccuracyChanged(Sensor sensor, int accuracy) { }
 
-    /*private float[] quaternionToEuler(float[] quaternion){
-        float theta = (float) (2*Math.acos(quaternion[4]));
-        float sinTheta = (float) Math.sin(theta);
-        float[] euler = new float[3];
-        for(int i = 0; i < 3; i++){
-            euler[i] = quaternion[i] / sinTheta;
+    private void storeTouchEvent(Bundle b){
+        Long start = b.getLong("START");
+        Long end = b.getLong("END");
+        Log.d(TAG, new StringBuilder().append("WANT FROM ").append(start).append(" TO ").append(end).toString());
+        Collection<SensorEventData> before, during, after;
+        synchronized (EventStack.class) {
+            Log.d(TAG, new StringBuilder().append("FIRST ").append(eventStack.keySet().toArray()[0])
+                    .append(" LAST ").append(eventStack.keySet().toArray()[eventStack.size()-1]).toString());
+            before = eventStack.getBefore(start);
+            during = eventStack.getInRange(start, end);
         }
-        return euler;
-    }*/
-
-
-    /*private void getMemory(){
-        ActivityManager.MemoryInfo mi = new ActivityManager.MemoryInfo();
-        ActivityManager activityManager = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
-        activityManager.getMemoryInfo(mi);
-
-        double availableMegs = mi.availMem / 0x100000L;
-        Log.d(TAG, "Available memory: " + Double.toString(availableMegs) + "MB");
-        //Percentage can be calculated for API 16+
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN) {
-            double percentAvail = mi.availMem *100 / mi.totalMem;
-            Log.d(TAG, "Percentage available: " + Double.toString(percentAvail) + "% total: " +
-                    mi.totalMem / 0x100000L + "MB");
+        try {
+            Thread.sleep((end-start) * 2); //wait a bit to collect after touch events
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
-    }*/
-
-    /*private void getInstalledApps(){
-        Intent mainIntent = new Intent(Intent.ACTION_MAIN, null);
-        mainIntent.addCategory(Intent.CATEGORY_LAUNCHER);
-        List<ResolveInfo> pkgAppsList = context.getPackageManager().queryIntentActivities( mainIntent, 0);
-        for(ResolveInfo r: pkgAppsList){
-            ApplicationInfo appInfo = r.activityInfo.applicationInfo;
-            final String applicationName = (String) (appInfo != null ? context.getPackageManager().
-                    getApplicationLabel(appInfo) : "(unknown)");
-            Log.d(TAG, r.activityInfo.applicationInfo.processName + " " +
-                    applicationName );
+        //noise after event
+        synchronized (EventStack.class){
+            after = eventStack.getAfter(end);
+            eventStack = new EventStack();
         }
-    }*/
+        writeToCSVFile(b.getString("TYPE"), b.getString("ACTION"),  before, during, after);
+
+    }
+
+    private synchronized void writeToCSVFile(String eventType, String eventAction,
+                                Collection<SensorEventData> before,
+                                Collection<SensorEventData> during,
+                                Collection<SensorEventData> after) {
+        StringBuilder sb = new StringBuilder();
+        Log.d(TAG, "Before " + Integer.toString(before.size()) + " DURING" +
+                Integer.toString(during.size()) + " AFTER" + Integer.toString(after.size()));
+        for(SensorEventData e : before){
+            sb.append(e.toCSV());
+            sb.append("BEFORE,");
+            sb.append(eventType).append(",").append(eventAction).append("\n");
+        }
+        for(SensorEventData e : before){
+            sb.append(e.toCSV());
+            sb.append("DURING,");
+            sb.append(eventType).append(",").append(eventAction).append("\n");
+        }
+        for(SensorEventData e : before){
+            sb.append(e.toCSV());
+            sb.append("AFTER,");
+            sb.append(eventType).append(",").append(eventAction).append("\n");
+        }
+        try {
+            csvStream.writeChars(sb.toString());
+            csvStream.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+            Log.e(TAG, Log.getStackTraceString(e));
+        }
+        Log.d(TAG, "Writing!:\n " + sb.toString());
+    }
 
 
 }
