@@ -55,7 +55,6 @@ public class MainActivity extends AppCompatActivity {
 
             case MotionEvent.ACTION_DOWN:
                 currentMotionEvent = new TouchEvent(event);
-
                 int[] location = new int[2];
                 drawView.getLocationInWindow(location);
                 drawView.testTouch(new Point((int) eventX - location[0], (int) eventY-location[1]));

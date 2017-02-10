@@ -9,7 +9,6 @@ import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.MotionEvent;
 
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
@@ -122,7 +121,7 @@ public class SensorGatherService extends IntentService implements SensorEventLis
     /*The timestamps are not defined as being the Unix time;
     they're just "a time" that's only valid for a given sensor.
      This means that timestamps can only be compared if they come from the same sensor.
-     Oh boi*/
+     O boi*/
 
     @Override
     public void onSensorChanged(SensorEvent event) {
@@ -144,11 +143,8 @@ public class SensorGatherService extends IntentService implements SensorEventLis
     private void storeTouchEvent(Bundle b){
         Long start = b.getLong("START");
         Long end = b.getLong("END");
-        Log.d(TAG, new StringBuilder().append("WANT FROM ").append(start).append(" TO ").append(end).toString());
         Collection<SensorEventData> before, during, after;
         synchronized (EventStack.class) {
-            Log.d(TAG, new StringBuilder().append("FIRST ").append(eventStack.keySet().toArray()[0])
-                    .append(" LAST ").append(eventStack.keySet().toArray()[eventStack.size()-1]).toString());
             before = eventStack.getBefore(start);
             during = eventStack.getInRange(start, end);
         }
@@ -178,12 +174,12 @@ public class SensorGatherService extends IntentService implements SensorEventLis
             sb.append("BEFORE,");
             sb.append(eventType).append(",").append(eventAction).append("\n");
         }
-        for(SensorEventData e : before){
+        for(SensorEventData e : during){
             sb.append(e.toCSV());
             sb.append("DURING,");
             sb.append(eventType).append(",").append(eventAction).append("\n");
         }
-        for(SensorEventData e : before){
+        for(SensorEventData e : after){
             sb.append(e.toCSV());
             sb.append("AFTER,");
             sb.append(eventType).append(",").append(eventAction).append("\n");
@@ -195,7 +191,6 @@ public class SensorGatherService extends IntentService implements SensorEventLis
             e.printStackTrace();
             Log.e(TAG, Log.getStackTraceString(e));
         }
-        Log.d(TAG, "Writing!:\n " + sb.toString());
     }
 
 
