@@ -46,7 +46,7 @@ public class SensorEventData  {
         float[] values = new float[5];
         //this way we can use 3d sensors and quaternions
         System.arraycopy(this.values, 0, values, 0, this.values.length);
-        sb.append(timestamp).append(",").append(sensorName).append(",");
+        sb.append(timestamp).append(",").append('"' + sensorName + '"').append(",");
         for(float value : values){
             sb.append(value).append(",");
         }

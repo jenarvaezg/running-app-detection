@@ -14,6 +14,7 @@ import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.text.DateFormat;
 import java.util.Collection;
@@ -29,12 +30,11 @@ public class SensorGatherService extends IntentService implements SensorEventLis
         super("SensorGatherService");
     }
 
-    private static DataOutputStream csvStream;
+    private static FileWriter csvWriter;
 
     private static final String TAG = "Service";
 
     protected static final String ACTION_START = "START";
-    protected static final String ACTION_UPDATE = "UPDATE";
     protected static final String ACTION_STOP = "STOP";
     protected static final String ACTION_STORE_TOUCH_EVENT = "STORE";
 
@@ -90,9 +90,8 @@ public class SensorGatherService extends IntentService implements SensorEventLis
             DateFormat format = new java.text.SimpleDateFormat("yy-MM-dd.HH:mm:ss");
             String dateString = format.format(new Date(System.currentTimeMillis()));
             Log.d(TAG, dateString);
-            csvStream = new DataOutputStream(new BufferedOutputStream(
-                    new FileOutputStream(f.getAbsolutePath() + "/"+dateString+".csv")));
-            csvStream.writeChars("timestamp,sensor,value0,value1,value2,value3,value4,when,type,action\n");
+            csvWriter = new FileWriter(new File(f.getAbsolutePath() + "/"+dateString+".csv"));
+            csvWriter.write("ID,timestamp,sensor,value0,value1,value2,value3,value4,when,type,action\n");
         } catch (IOException e) {
             Log.e(TAG, Log.getStackTraceString(e));
             return;
@@ -121,6 +120,7 @@ public class SensorGatherService extends IntentService implements SensorEventLis
     /*The timestamps are not defined as being the Unix time;
     they're just "a time" that's only valid for a given sensor.
      This means that timestamps can only be compared if they come from the same sensor.
+     ...
      O boi*/
 
     @Override
@@ -158,35 +158,42 @@ public class SensorGatherService extends IntentService implements SensorEventLis
             after = eventStack.getAfter(end);
             eventStack = new EventStack();
         }
-        writeToCSVFile(b.getString("TYPE"), b.getString("ACTION"),  before, during, after);
+        Integer id = before.hashCode();
+        writeToCSVFile(b.getString("TYPE"), b.getString("ACTION"),  before, during, after, id);
 
     }
 
     private synchronized void writeToCSVFile(String eventType, String eventAction,
                                 Collection<SensorEventData> before,
                                 Collection<SensorEventData> during,
-                                Collection<SensorEventData> after) {
+                                Collection<SensorEventData> after,
+                                Integer id) {
         StringBuilder sb = new StringBuilder();
+
         Log.d(TAG, "Before " + Integer.toString(before.size()) + " DURING" +
                 Integer.toString(during.size()) + " AFTER" + Integer.toString(after.size()));
         for(SensorEventData e : before){
+            sb.append(id).append(",");
             sb.append(e.toCSV());
-            sb.append("BEFORE,");
-            sb.append(eventType).append(",").append(eventAction).append("\n");
+            sb.append("\"BEFORE\",");
+            sb.append('"' +eventType+ '"').append(",").append('"' +eventAction + '"').append("\n");
         }
         for(SensorEventData e : during){
+            sb.append(id).append(",");
             sb.append(e.toCSV());
-            sb.append("DURING,");
-            sb.append(eventType).append(",").append(eventAction).append("\n");
+            sb.append("\"DURING\",");
+            sb.append('"' +eventType+ '"').append(",").append('"' +eventAction + '"').append("\n");
         }
         for(SensorEventData e : after){
+            sb.append(id).append(",");
             sb.append(e.toCSV());
-            sb.append("AFTER,");
-            sb.append(eventType).append(",").append(eventAction).append("\n");
+            sb.append("\"AFTER\",");
+            sb.append('"' +eventType+ '"').append(",").append('"' +eventAction + '"').append("\n");
         }
         try {
-            csvStream.writeChars(sb.toString());
-            csvStream.flush();
+            Log.d(TAG, new String(sb.toString().getBytes()));
+            csvWriter.write(sb.toString());
+            csvWriter.flush();
         } catch (IOException e) {
             e.printStackTrace();
             Log.e(TAG, Log.getStackTraceString(e));

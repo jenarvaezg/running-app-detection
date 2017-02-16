@@ -16,6 +16,7 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MAIN";
     private static final Long uptimestamp =  System.currentTimeMillis() - SystemClock.uptimeMillis();
+    private static Integer nActions = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,11 +50,12 @@ public class MainActivity extends AppCompatActivity {
         float eventX = event.getX();
         float eventY = event.getY();
         Intent intent;
-
-        textView.setText("X: " + Float.toString(eventX) + ", Y: " + Float.toString(eventY));
+        textView.setText("X: " + Float.toString(eventX) + ", Y: " + Float.toString(eventY)
+                + Integer.toString(nActions));
         switch (event.getAction()){
 
             case MotionEvent.ACTION_DOWN:
+                nActions++;
                 currentMotionEvent = new TouchEvent(event);
                 int[] location = new int[2];
                 drawView.getLocationInWindow(location);
