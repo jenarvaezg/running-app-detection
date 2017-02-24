@@ -102,13 +102,13 @@ public class SensorGatherService extends IntentService implements SensorEventLis
         mSensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
 
         Sensor mAccelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-        Sensor mRotationVector = mSensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
+        //Sensor mRotationVector = mSensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
         Sensor mGyroscope = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
-        Sensor mGameRotationVector = mSensorManager.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR);
+        //Sensor mGameRotationVector = mSensorManager.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR);
         mSensorManager.registerListener(this, mAccelerometer, SensorManager.SENSOR_DELAY_FASTEST);
         mSensorManager.registerListener(this, mGyroscope, SensorManager.SENSOR_DELAY_FASTEST);
-        mSensorManager.registerListener(this, mRotationVector, SensorManager.SENSOR_DELAY_FASTEST);
-        mSensorManager.registerListener(this, mGameRotationVector, SensorManager.SENSOR_DELAY_FASTEST);
+        //mSensorManager.registerListener(this, mRotationVector, SensorManager.SENSOR_DELAY_FASTEST);
+        //mSensorManager.registerListener(this, mGameRotationVector, SensorManager.SENSOR_DELAY_FASTEST);
     }
 
     private void stopSensors(){
@@ -191,7 +191,7 @@ public class SensorGatherService extends IntentService implements SensorEventLis
             sb.append('"' +eventType+ '"').append(",").append('"' +eventAction + '"').append("\n");
         }
         try {
-            Log.d(TAG, new String(sb.toString().getBytes()));
+            Log.d(TAG, sb.toString());
             csvWriter.write(sb.toString());
             csvWriter.flush();
         } catch (IOException e) {

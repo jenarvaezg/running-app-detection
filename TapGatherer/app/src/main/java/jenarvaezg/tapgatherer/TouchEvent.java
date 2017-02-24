@@ -47,9 +47,9 @@ class TouchEvent extends LinkedList<MotionEvent>{
 
     private String getSwipeOrientation() {
         if (isHorizontal()){
-            return getFirst().getX() < getLast().getX() ? "RIGHT->LEFT" : "LEFT->RIGHT";
+            return getFirst().getX() > getLast().getX() ? "RIGHT->LEFT" : "LEFT->RIGHT";
         }
-        return getFirst().getY() < getLast().getY() ? "BOTTOM->TOP" : "TOP->BOTTOM";
+        return getFirst().getY() > getLast().getY() ? "BOTTOM->TOP" : "TOP->BOTTOM";
     }
 
     private String getTouchRegion(WindowManager windowManager){
