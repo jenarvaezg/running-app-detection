@@ -27,8 +27,6 @@ public class DrawView extends SurfaceView implements SurfaceHolder.Callback {
     Boolean surfaceCreated = false;
 
 
-
-
     public DrawView(Context context, AttributeSet attrs){
         super(context, attrs);
         this.context = context;
@@ -82,6 +80,9 @@ public class DrawView extends SurfaceView implements SurfaceHolder.Callback {
     }
 
     void testTouch(Point p){
+        if(currentCircle == null){
+            return;
+        }
         if (currentCircle.isPointInside(p)){
             drawNewCircle();
         }

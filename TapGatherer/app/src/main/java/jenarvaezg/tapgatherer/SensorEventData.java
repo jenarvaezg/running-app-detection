@@ -27,13 +27,6 @@ public class SensorEventData  {
                 break;
             case Sensor.TYPE_GYROSCOPE:
                 sensorName = "Gyroscope";
-                break;
-            case Sensor.TYPE_GAME_ROTATION_VECTOR:
-                sensorName = "GameRotationVector";
-                break;
-            case Sensor.TYPE_ROTATION_VECTOR:
-                sensorName = "RotationVector";
-                break;
         }
     }
 
@@ -43,11 +36,8 @@ public class SensorEventData  {
 
     public String toCSV() {
         StringBuilder sb = new StringBuilder();
-        float[] values = new float[5];
-        //this way we can use 3d sensors and quaternions
-        System.arraycopy(this.values, 0, values, 0, this.values.length);
         sb.append(timestamp).append(",").append('"' + sensorName + '"').append(",");
-        for(float value : values){
+        for(float value : this.values){
             sb.append(value).append(",");
         }
         return sb.toString();

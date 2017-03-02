@@ -1,5 +1,11 @@
 <resources>
     <string name="app_name">TapGatherer</string>
     <string name="start">Start</string>
+    <string name="predicting">Predicting</string>
+    <string name="training">Training</string>
     <string name="stop">Stop</string>
+    <string name="dialog_message">Do you want to improve the model (train) or start predicting?</string>
+    <string name="dialog_title">Sensor gathering mode</string>
+    <string name="dialog_train">Train</string>
+    <string name="dialog_predict">Predict</string>
 </resources>

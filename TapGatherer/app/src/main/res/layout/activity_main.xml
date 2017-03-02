@@ -15,11 +15,15 @@
             android:layout_height="wrap_content"
             android:id="@+id/drawViewText"
             android:textAlignment="center"/>
-        <Button
+        <Switch
             android:layout_height="wrap_content"
             android:layout_width="0dp"
             android:layout_weight="1"
-            android:text="@string/start"/>
+            android:textOn="@string/stop"
+            android:showText="true"
+            android:textOff="@string/start"
+            android:id="@+id/startstop_button"/>
+
     </LinearLayout>
 
 

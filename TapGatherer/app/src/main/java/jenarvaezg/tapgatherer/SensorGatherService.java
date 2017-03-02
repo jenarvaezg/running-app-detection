@@ -17,6 +17,8 @@ import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.text.DateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
@@ -35,12 +37,19 @@ public class SensorGatherService extends IntentService implements SensorEventLis
     private static final String TAG = "Service";
 
     protected static final String ACTION_START = "START";
+    protected static final String ACTION_PREDICT = "PREDICT";
+    protected static final String ACTION_TRAIN = "TRAIN";
     protected static final String ACTION_STOP = "STOP";
     protected static final String ACTION_STORE_TOUCH_EVENT = "STORE";
+    private static Boolean predicting = false;
+    private static Boolean training = false;
 
-    private  SensorManager mSensorManager;
+    private static SensorManager mSensorManager;
+    private static Integer WINDOW_SIZE = 20;
 
     private static EventStack eventStack;
+    private static ArrayList<EventWindowFeatures> eventFeatures = new ArrayList<>();
+    private static ArrayList<SensorEventData> events = new ArrayList<>();
 
     static Map<Integer, TimeBase> sensorOffsets = new HashMap<>();
 
@@ -68,6 +77,12 @@ public class SensorGatherService extends IntentService implements SensorEventLis
                 storeTouchEvent(bundle);
             }else if(ACTION_STOP.equals(action)) {
                 stopSensors();
+                training = false;
+                predicting = false;
+            }else if(ACTION_TRAIN.equals(action)) {
+                startTraining();
+            }else if(ACTION_PREDICT.equals(action)){
+                predicting = true;
             }else{
                 Log.wtf(TAG, "DUDE WHAT '" + action + "'");
             }
@@ -75,6 +90,19 @@ public class SensorGatherService extends IntentService implements SensorEventLis
     }
 
     private void startSensors(){
+
+        eventStack = new EventStack();
+
+        mSensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+
+        Sensor mAccelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        Sensor mGyroscope = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
+        mSensorManager.registerListener(this, mAccelerometer, SensorManager.SENSOR_DELAY_FASTEST);
+        mSensorManager.registerListener(this, mGyroscope, SensorManager.SENSOR_DELAY_FASTEST);
+    }
+
+    private void startTraining(){
+        training = true;
         try {
 
             //assume we have external storage, fail miserably otherwise
@@ -91,31 +119,24 @@ public class SensorGatherService extends IntentService implements SensorEventLis
             String dateString = format.format(new Date(System.currentTimeMillis()));
             Log.d(TAG, dateString);
             csvWriter = new FileWriter(new File(f.getAbsolutePath() + "/"+dateString+".csv"));
-            csvWriter.write("ID,timestamp,sensor,value0,value1,value2,value3,value4,when,type,action\n");
+            csvWriter.write("ID,timestamp,sensor,value0,value1,value2,when,type,action\n");
         } catch (IOException e) {
             Log.e(TAG, Log.getStackTraceString(e));
             return;
         }
-
-        eventStack = new EventStack();
-
-        mSensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
-
-        Sensor mAccelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-        //Sensor mRotationVector = mSensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
-        Sensor mGyroscope = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
-        //Sensor mGameRotationVector = mSensorManager.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR);
-        mSensorManager.registerListener(this, mAccelerometer, SensorManager.SENSOR_DELAY_FASTEST);
-        mSensorManager.registerListener(this, mGyroscope, SensorManager.SENSOR_DELAY_FASTEST);
-        //mSensorManager.registerListener(this, mRotationVector, SensorManager.SENSOR_DELAY_FASTEST);
-        //mSensorManager.registerListener(this, mGameRotationVector, SensorManager.SENSOR_DELAY_FASTEST);
     }
 
     private void stopSensors(){
         mSensorManager.unregisterListener(this);
+        try {
+            csvWriter.close();
+        } catch (Exception e) {
+            //pass
+            Log.e(TAG, Log.getStackTraceString(e));
+        }
     }
 
-
+    //TODO fix training so we get features instead of raw
 
     /*The timestamps are not defined as being the Unix time;
     they're just "a time" that's only valid for a given sensor.
@@ -130,9 +151,33 @@ public class SensorGatherService extends IntentService implements SensorEventLis
             offset = new TimeBase(System.currentTimeMillis(), event.timestamp);
             sensorOffsets.put(event.sensor.getType(), offset);
         }
-        synchronized (EventStack.class) {
-            eventStack.put((event.timestamp - offset.timestampBase) / 1000000L + offset.dateBase,
-                    new SensorEventData(event, offset));
+        if (training) {
+            synchronized (EventStack.class) {
+                eventStack.put((event.timestamp - offset.timestampBase) / 1000000L + offset.dateBase,
+                        new SensorEventData(event, offset));
+            }
+        }else if(predicting){
+            events.add(new SensorEventData(event, offset));
+            if(events.size() > WINDOW_SIZE){
+                events.remove(0);
+            }
+
+            if(events.size() == WINDOW_SIZE){
+                final SensorEventData[] events_a = events.toArray(new SensorEventData[0]);
+
+                EventWindowFeatures features = new EventWindowFeatures(events_a);
+                synchronized (eventFeatures) {
+                    eventFeatures.add(features);
+                    if(eventFeatures.size() >= 100){
+                        final EventWindowFeatures[] features_a =
+                                eventFeatures.toArray(new EventWindowFeatures[0]);
+                        eventFeatures = new ArrayList<>();
+                        //send features_a via network
+                        Log.d(TAG, features_a[0].toCSV());
+                    }
+                }
+            }
+
         }
     }
 
@@ -141,9 +186,12 @@ public class SensorGatherService extends IntentService implements SensorEventLis
     public void onAccuracyChanged(Sensor sensor, int accuracy) { }
 
     private void storeTouchEvent(Bundle b){
+        if(!training){
+            return;
+        }
         Long start = b.getLong("START");
         Long end = b.getLong("END");
-        Collection<SensorEventData> before, during, after;
+        final Collection<SensorEventData> before, during, after;
         synchronized (EventStack.class) {
             before = eventStack.getBefore(start);
             during = eventStack.getInRange(start, end);
@@ -158,9 +206,47 @@ public class SensorGatherService extends IntentService implements SensorEventLis
             after = eventStack.getAfter(end);
             eventStack = new EventStack();
         }
-        Integer id = before.hashCode();
-        writeToCSVFile(b.getString("TYPE"), b.getString("ACTION"),  before, during, after, id);
+        final Integer id = before.hashCode();
+        final String type = b.getString("TYPE");
+        final String action = b.getString("ACTION");
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                EventWindowFeatures[] features = extractTrainFeatures(type, action,
+                        before, during, after, id);
+                //send features via network
+                Log.d(TAG, Integer.toString(features.length));
+            }
+        });
+        t.run();
 
+        //writeToCSVFile(b.getString("TYPE"), b.getString("ACTION"),  before, during, after, id);
+
+    }
+
+    private EventWindowFeatures[] extractTrainFeatures(String eventType, String eventAction,
+                                                       Collection<SensorEventData> before,
+                                                       Collection<SensorEventData> during,
+                                                       Collection<SensorEventData> after,
+                                                       Integer id){
+        Integer startDuringPos = before.size();
+        Integer endDuringPos = startDuringPos + during.size();
+        SensorEventData[] events = new SensorEventData[endDuringPos + after.size()];
+        System.arraycopy(before.toArray(new SensorEventData[0]), 0, events, 0, startDuringPos);
+        System.arraycopy(during.toArray(new SensorEventData[0]), 0, events, startDuringPos,
+                endDuringPos - startDuringPos);
+        System.arraycopy(after.toArray(new SensorEventData[0]), 0, events, endDuringPos, after.size());
+        EventWindowFeatures[] features = new EventWindowFeatures[events.length - WINDOW_SIZE];
+        for(int i = 0; i < events.length - WINDOW_SIZE; i++){
+            String when = i < startDuringPos ? "BEFORE" : i < endDuringPos ? "DURING" : "AFTER";
+            SensorEventData[] thisWindowEvents = Arrays.copyOfRange(events, i, i+WINDOW_SIZE);
+            EventWindowFeatures thisWindowFeatures = new EventWindowFeatures(thisWindowEvents);
+            thisWindowFeatures.setLabels(when, eventAction, eventType);
+            features[i] = thisWindowFeatures;
+        }
+
+
+        return features;
     }
 
     private synchronized void writeToCSVFile(String eventType, String eventAction,
