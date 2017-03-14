@@ -49,18 +49,16 @@ class HTTPServer_RequestHandler(BaseHTTPRequestHandler):
                                                             features=models_config.features,
                                                             max_iterations = models_config.noise_max_iterations,
                                                             max_depth = models_config.noise_max_depth)
-       type_model = graphlab.boosted_trees_classifier.create(not_noise,
-                                                            target="type",
-                                                            features=models_config.features,
-                                                            max_iterations = models_config.type_max_iterations,
-                                                            max_depth = models_config.type_max_depth)
-
+        type_model = graphlab.boosted_trees_classifier.create(not_noise,
+                                                              target="type",
+                                                              features=models_config.features,
+                                                              max_iterations = models_config.type_max_iterations,
+                                                              max_depth = models_config.type_max_depth)
         swipe_model = graphlab.boosted_trees_classifier.create(swipes,
                                                              target="action",
                                                              features=models_config.features,
                                                              max_iterations = models_config.swipe_max_iterations,
                                                              max_depth = models_config.swipe_max_depth)
-
         touch_model = graphlab.boosted_trees_classifier.create(touches,
                                                              target="action",
                                                              features=models_config.features,
