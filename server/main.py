@@ -13,14 +13,16 @@ class HTTPServer_RequestHandler(BaseHTTPRequestHandler):
 
 
 
-    def get_msg(self):
-        gz_blob = self.rfile.read(int(self.headers['Content-Length']))
+    def get_msg(self, compressed=False):
+        blob = self.rfile.read(int(self.headers['Content-Length']))
+	if not compressed:
+		return blob
         message = zlib.decompress(gz_blob, 16+zlib.MAX_WBITS)
         return message
 
 
-    def save_msg_to_file(self, path):
-        message = self.get_msg()
+    def save_msg_to_file(self, path, compressed=False):
+        message = self.get_msg(compressed)
         if os.path.isfile(path): #user already has data
             message = "\n".join(message.split("\n")[1:]) + "\n" #remove csv headers
 
@@ -29,21 +31,23 @@ class HTTPServer_RequestHandler(BaseHTTPRequestHandler):
 
     def update_taps(self):
         path = "data/" + self.user + "_taps.csv"
-        save_msg_to_file(path)
+        self.save_msg_to_file(path)
 
     def update_apps(self):
         path = "data/" + self.user + "_apps.csv"
-        save_msg_to_file(path)
+        self.save_msg_to_file(path)
 
     def train_taps(self):
         path = "data/" + self.user + "_taps.csv"
-        user_taps_sf = graphlab.SFrame.read_csv()
+        user_taps_sf = graphlab.SFrame.read_csv(path)
         print user_taps_sf
 
-        not_noise = user_taps_sf[user_taps_sf['noise'] == 0] #check
+        not_noise = user_taps_sf[user_taps_sf['noise'] == 0]
+	print len(not_noise), "NOT_NOISE"
         swipes = not_noise[not_noise['type'] == "SWIPE"]
+	print len(swipes), "SWIPES"
         touches = not_noise[not_noise['type'] == "TOUCH"]
-
+	print len(touches), "TOUCHES"
         noise_model = graphlab.boosted_trees_classifier.create(user_taps_sf,
                                                             target="noise",
                                                             features=models_config.features,
@@ -65,30 +69,32 @@ class HTTPServer_RequestHandler(BaseHTTPRequestHandler):
                                                              max_iterations = models_config.touch_max_iterations,
                                                              max_depth = models_config.touch_max_depth)
 
-        noise_model.save("models/" + self.user + "noise_model")
-        type_model.save("models/" + self.user + "type_model")
-        swipe_model.save("models/" + self.user + "swipe_model")
-        touch_model.save("models/" + self.user + "touch_model")
+        noise_model.save("models/" + self.user + "_noise_model")
+        type_model.save("models/" + self.user + "_type_model")
+        swipe_model.save("models/" + self.user + "_swipe_model")
+        touch_model.save("models/" + self.user + "_touch_model")
 
 
 
 
     def predict_taps(self):
         path = "/tmp/" + self.user + "_temp_taps.csv"
-        save_msg_to_file(path)
+        self.save_msg_to_file(path, compressed=False)
         taps_sf = graphlab.SFrame.read_csv(path)
-        noise_model = graphlab.load_model("models/" + self.user + "noise_model")
-        type_model = graphlab.load_model("models/" + self.user + "type_model")
-        touch_model = graphlab.load_model("models/" + self.user + "touch_model")
-        swipe_model = graphlab.load_model("models/" + self.user + "swipe_model")
+        noise_model = graphlab.load_model("models/" + self.user + "_noise_model")
+        type_model = graphlab.load_model("models/" + self.user + "_type_model")
+        touch_model = graphlab.load_model("models/" + self.user + "_touch_model")
+        swipe_model = graphlab.load_model("models/" + self.user + "_swipe_model")
 
         result = []
 
         for tap_sf in taps_sf:
-            if noise_model.predict(tap_sf):
+	    print "NOISE?", noise_model.predict(tap_sf)
+	    if noise_model.predict(tap_sf)[0]:
                 result.append("NOISE")
                 continue
-            if type_model.predict(tap_sf) == "SWIPE":
+            print "TYPE?", type_model.predict(tap_sf)
+            if type_model.predict(tap_sf)[0] == "SWIPE":
                 result.append(swipe_model.predict(tap_sf))
             else:
                 result.append(touch_model.predict(tap_sf))
@@ -96,18 +102,16 @@ class HTTPServer_RequestHandler(BaseHTTPRequestHandler):
         print result
 
     def do_POST(self):
-
         c = Cookie.SimpleCookie()
         try:
             c.load(self.headers.get("Cookie"))
             self.user = c['user'].value
-            if not self.user.isdigit():
+            if not self.user.isalnum():
                 raise Exception("Non numeric user")
         except:
             self.send_response(403)
             self.end_headers()
             return
-
 
         if self.path == "/train_taps":
             self.train_taps()
