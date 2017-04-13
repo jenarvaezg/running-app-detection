@@ -26,7 +26,8 @@ public class EventWindowFeatures{
     private String when, action, type;
     private Integer noise = 0;
 
-    EventWindowFeatures(SensorEventData[] events){
+    EventWindowFeatures(SensorEventData[] events, Boolean isLabeled){
+        this.isLabeled = isLabeled;
         final ArrayList<SensorEventData> gyroEvents = new ArrayList<>();
         final ArrayList<SensorEventData> accelEvents = new ArrayList<>();
         for(SensorEventData event : events){
@@ -60,7 +61,7 @@ public class EventWindowFeatures{
 
     void setLabels(String when, String action, String type){
         this.when = when;
-        if(when.equals("DURING")){
+        if(!when.equals("DURING")){
             this.action = "NOISE";
             this.type = "NOISE";
             this.noise = 1;
@@ -75,8 +76,7 @@ public class EventWindowFeatures{
         Integer offset = sensor.equals("accel") ? 0 : 3;
         Integer size = events.size();
         if(size == 0){
-            Log.d(TAG, "GOT 0 for " + sensor);
-            return; //this is ok sinze all is initialized to 0
+            return; //this is ok since all is initialized to 0
         }
         Float[] sums = new Float[]{0f, 0f, 0f};
         Float[] sorted_x = new Float[size];
@@ -141,7 +141,7 @@ public class EventWindowFeatures{
 
     public static String getTrainingCSVHeader() {
         String base = getCSVHeader();
-        return base + "when,noise,type,action\n";
+        return base.substring(0, base.length() - 1) + ",when,noise,type,action\n";
     }
 
     String toCSV() {

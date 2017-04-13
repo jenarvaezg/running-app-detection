@@ -66,6 +66,8 @@ public class SensorGatherService extends IntentService implements SensorEventLis
 
     @Override
     protected void onHandleIntent(Intent intent) {
+
+        NetworkWorker.externalFilesDir = getExternalFilesDir(null);
         if (intent != null) {
             final String action = intent.getAction();
             Log.d(TAG, "GOT ACTION " + action);
@@ -77,12 +79,15 @@ public class SensorGatherService extends IntentService implements SensorEventLis
                 storeTouchEvent(bundle);
             }else if(ACTION_STOP.equals(action)) {
                 stopSensors();
+                if(training){
+                    sendTrainCommand();
+                }
                 training = false;
                 predicting = false;
             }else if(ACTION_TRAIN.equals(action)) {
                 startTraining();
             }else if(ACTION_PREDICT.equals(action)){
-                predicting = true;
+                predicting = true; //TODO
             }else{
                 Log.wtf(TAG, "DUDE WHAT '" + action + "'");
             }
@@ -114,6 +119,8 @@ public class SensorGatherService extends IntentService implements SensorEventLis
             if (!f.mkdirs()){
                 Log.d(TAG, f.getAbsolutePath() + " not created");
             }
+
+
             Log.d(TAG, f.getCanonicalPath());
             DateFormat format = new java.text.SimpleDateFormat("yy-MM-dd.HH:mm:ss");
             String dateString = format.format(new Date(System.currentTimeMillis()));
@@ -165,16 +172,36 @@ public class SensorGatherService extends IntentService implements SensorEventLis
             if(events.size() == WINDOW_SIZE){
                 final SensorEventData[] events_a = events.toArray(new SensorEventData[0]);
 
-                EventWindowFeatures features = new EventWindowFeatures(events_a);
+                EventWindowFeatures features = new EventWindowFeatures(events_a, false);
+
+                EventWindowFeatures[] features_a = null;
                 synchronized (eventFeatures) {
                     eventFeatures.add(features);
-                    if(eventFeatures.size() >= 100){
-                        final EventWindowFeatures[] features_a =
+                    if(eventFeatures.size() >= 1000){
+                        features_a =
                                 eventFeatures.toArray(new EventWindowFeatures[0]);
                         eventFeatures = new ArrayList<>();
                         //send features_a via network
-                        Log.d(TAG, features_a[0].toCSV());
+
                     }
+                }
+                if(features_a != null) {
+                    final EventWindowFeatures[] features_a_final = features_a;
+                    Thread t = new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+
+                            //send features via network
+                            StringBuilder sb = new StringBuilder();
+                            sb.append(EventWindowFeatures.getCSVHeader());
+                            for (EventWindowFeatures feature : features_a_final) {
+                                sb.append(feature.toCSV());
+                            }
+                            NetworkWorker.sendString(NetworkWorker.Urls.PREDICT_TAPS, sb.toString(), false);
+                            Log.d(TAG, "SENT PREDICT");
+                        }
+                    });
+                    t.start();
                 }
             }
 
@@ -193,11 +220,12 @@ public class SensorGatherService extends IntentService implements SensorEventLis
         Long end = b.getLong("END");
         final Collection<SensorEventData> before, during, after;
         synchronized (EventStack.class) {
-            before = eventStack.getBefore(start);
+            before = eventStack.getInRange(start - ((end-start) * 2), start);
+            //before = eventStack.getBefore(start); too much noise
             during = eventStack.getInRange(start, end);
         }
         try {
-            Thread.sleep((end-start) * 2); //wait a bit to collect after touch events
+            Thread.sleep((end-start)); //wait a bit to collect after touch events
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -215,12 +243,16 @@ public class SensorGatherService extends IntentService implements SensorEventLis
                 EventWindowFeatures[] features = extractTrainFeatures(type, action,
                         before, during, after, id);
                 //send features via network
-                Log.d(TAG, Integer.toString(features.length));
+                StringBuilder sb = new StringBuilder();
+                sb.append(EventWindowFeatures.getTrainingCSVHeader());
+                for(EventWindowFeatures feature: features){
+                    sb.append(feature.toCSV());
+                }
+                NetworkWorker.sendString(NetworkWorker.Urls.UPDATE_TAPS, sb.toString(), false);
+                Log.d(TAG, "SENT");
             }
         });
-        t.run();
-
-        //writeToCSVFile(b.getString("TYPE"), b.getString("ACTION"),  before, during, after, id);
+        t.start();
 
     }
 
@@ -237,10 +269,12 @@ public class SensorGatherService extends IntentService implements SensorEventLis
                 endDuringPos - startDuringPos);
         System.arraycopy(after.toArray(new SensorEventData[0]), 0, events, endDuringPos, after.size());
         EventWindowFeatures[] features = new EventWindowFeatures[events.length - WINDOW_SIZE];
+        Log.d(TAG, Integer.toString(startDuringPos) + " " + Integer.toString(endDuringPos) + " " +
+                Integer.toString(events.length));
         for(int i = 0; i < events.length - WINDOW_SIZE; i++){
             String when = i < startDuringPos ? "BEFORE" : i < endDuringPos ? "DURING" : "AFTER";
             SensorEventData[] thisWindowEvents = Arrays.copyOfRange(events, i, i+WINDOW_SIZE);
-            EventWindowFeatures thisWindowFeatures = new EventWindowFeatures(thisWindowEvents);
+            EventWindowFeatures thisWindowFeatures = new EventWindowFeatures(thisWindowEvents, true);
             thisWindowFeatures.setLabels(when, eventAction, eventType);
             features[i] = thisWindowFeatures;
         }
@@ -286,5 +320,10 @@ public class SensorGatherService extends IntentService implements SensorEventLis
         }
     }
 
+    private void sendTrainCommand(){
+        Log.d(TAG, "SENDING TRAIN TAPS");
+        NetworkWorker.sendString(NetworkWorker.Urls.TRAIN_TAPS, "", true);
+        Log.d(TAG, "MODEL READY");
+    }
 
 }
