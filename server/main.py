@@ -1,15 +1,26 @@
 from BaseHTTPServer import HTTPServer
 from BaseHTTPServer import BaseHTTPRequestHandler
+from SocketServer import ThreadingMixIn
 import Cookie
 import zlib
 import graphlab
 import os
 import tempfile
+import random
+
+from StringIO import StringIO
+import pandas as pd
 
 import models_config
+import numpy as np
 
-# HTTPRequestHandler class
-class HTTPServer_RequestHandler(BaseHTTPRequestHandler):
+graphlab.SFrame() #so frapglab really starts now
+
+
+models = {}
+
+# RequestHandler class
+class RequestHandler(BaseHTTPRequestHandler):
 
 
 
@@ -73,32 +84,41 @@ class HTTPServer_RequestHandler(BaseHTTPRequestHandler):
         type_model.save("models/" + self.user + "_type_model")
         swipe_model.save("models/" + self.user + "_swipe_model")
         touch_model.save("models/" + self.user + "_touch_model")
-
+	load_models()
 
 
 
     def predict_taps(self):
-        path = "/tmp/" + self.user + "_temp_taps.csv"
-        self.save_msg_to_file(path, compressed=False)
-        taps_sf = graphlab.SFrame.read_csv(path)
-        noise_model = graphlab.load_model("models/" + self.user + "_noise_model")
-        type_model = graphlab.load_model("models/" + self.user + "_type_model")
-        touch_model = graphlab.load_model("models/" + self.user + "_touch_model")
-        swipe_model = graphlab.load_model("models/" + self.user + "_swipe_model")
-
+	print "GOOOO"
+	df = pd.read_csv(self.rfile)
+	taps_sf = graphlab.SFrame(df)
+        noise_model = models[self.user]['noise'] #graphlab.load_model("models/" + self.user + "_noise_model")
+        type_model = models[self.user]['type'] #graphlab.load_model("models/" + self.user + "_type_model")
+        touch_model = models[self.user]['touch'] #graphlab.load_model("models/" + self.user + "_touch_model")
+        swipe_model = models[self.user]['swipe'] #graphlab.load_model("models/" + self.user + "_swipe_model")
+	print "models loaded"
         result = []
 
-        for tap_sf in taps_sf:
-	    print "NOISE?", noise_model.predict(tap_sf)
-	    if noise_model.predict(tap_sf)[0]:
-                result.append("NOISE")
-                continue
-            print "TYPE?", type_model.predict(tap_sf)
-            if type_model.predict(tap_sf)[0] == "SWIPE":
-                result.append(swipe_model.predict(tap_sf))
+	noise_predictions = noise_model.predict(taps_sf)
+	if (noise_predictions == 1).all():
+		print "ALL NOISE"
+		return
+		
+	noise_before = False
+        for i in range(len(taps_sf)): 
+	    if noise_predictions[i]:
+		if not noise_before:
+	                result.append("NOISE")
+			noise_before = True
+		continue
+	    noise_before = False
+            if type_model.predict(taps_sf[i])[0] == "SWIPE":
+                result.append(swipe_model.predict(taps_sf[i])[0])
             else:
-                result.append(touch_model.predict(tap_sf))
+                result.append(touch_model.predict(taps_sf[i])[0])
+	
 
+	
         print result
 
     def do_POST(self):
@@ -122,7 +142,11 @@ class HTTPServer_RequestHandler(BaseHTTPRequestHandler):
         elif self.path == "/update_apps":
             self.update_apps()
         elif self.path == "/predict_taps":
+	    self.send_response(200)
+	    self.send_header('Content-type', 'text/html')
+	    self.end_headers()
             self.predict_taps()
+	    return
         elif self.path == "/predict_apps":
             self.predict_apps()
         else:
@@ -136,13 +160,36 @@ class HTTPServer_RequestHandler(BaseHTTPRequestHandler):
         return
 
 
+class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+	"""Handle requests in a separate thread."""
+
+
+
+def load_models():
+	import os
+	global models
+	all_models = os.listdir("models")
+	for model_path in all_models:
+		model = graphlab.load_model("models/" + model_path)
+		spl = model_path.split("_")
+		user = spl[0]
+		type = spl[1]
+		if not user in models:
+			models[user] = {}
+		models[user][type] = model
+	
+			
+
 def run():
   print('starting server...')
 
   server_address = ('0.0.0.0', 8081)
-  httpd = HTTPServer(server_address, HTTPServer_RequestHandler)
+  #httpd = HTTPServer(server_address, HTTPServer_RequestHandler)
+  server = ThreadedHTTPServer(server_address, RequestHandler)
   print('running server...')
-  httpd.serve_forever()
+  load_models()
+
+  server.serve_forever()
 
 if __name__ == "__main__":
     run()
