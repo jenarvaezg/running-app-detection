@@ -91,7 +91,6 @@ public class NetworkWorker   {
             Log.e(TAG, Log.getStackTraceString(e));
             return "";
         }
-        Log.d(TAG, "URL: " + url.toString());
         HttpURLConnection conn = null;
         try {
             conn = (HttpURLConnection) u.openConnection();
@@ -111,14 +110,10 @@ public class NetworkWorker   {
             return "";
         }
         InputStreamReader isr = null;
-        Log.d(TAG, Integer.toString(toSend.split("\n").length));
         try {
             OutputStream os = conn.getOutputStream();
             os.write(toSend.getBytes());
             os.flush();
-            /*gzos = new GZIPOutputStream(conn.getOutputStream());
-            gzos.write(toSend.getBytes());
-            gzos.flush();*/
             Log.d(TAG,"WRITTEN");
 
             isr = new InputStreamReader(conn.getInputStream());

@@ -22,7 +22,7 @@ class TouchEvent extends LinkedList<MotionEvent>{
     }
 
     private Boolean isTouch(){
-        return size() == 2;
+        return size() <= 3;
     }
 
 

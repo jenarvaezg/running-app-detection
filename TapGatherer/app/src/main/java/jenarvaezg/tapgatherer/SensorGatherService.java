@@ -73,7 +73,6 @@ public class SensorGatherService extends IntentService implements SensorEventLis
             Log.d(TAG, "GOT ACTION " + action);
             if (ACTION_START.equals(action)) {
                 Log.d(TAG, "Go!");
-                startSensors();
             }else if(ACTION_STORE_TOUCH_EVENT.equals(action)){
                 Bundle bundle = intent.getExtras();
                 storeTouchEvent(bundle);
@@ -82,11 +81,15 @@ public class SensorGatherService extends IntentService implements SensorEventLis
                 if(training){
                     sendTrainCommand();
                 }
+                events = new ArrayList<>();
+                eventFeatures = new ArrayList<>();
                 training = false;
                 predicting = false;
             }else if(ACTION_TRAIN.equals(action)) {
+                startSensors(SensorManager.SENSOR_DELAY_GAME);
                 startTraining();
             }else if(ACTION_PREDICT.equals(action)){
+                startSensors(SensorManager.SENSOR_DELAY_GAME);
                 predicting = true; //TODO
             }else{
                 Log.wtf(TAG, "DUDE WHAT '" + action + "'");
@@ -94,7 +97,7 @@ public class SensorGatherService extends IntentService implements SensorEventLis
         }
     }
 
-    private void startSensors(){
+    private void startSensors(Integer delay){
 
         eventStack = new EventStack();
 
@@ -102,8 +105,8 @@ public class SensorGatherService extends IntentService implements SensorEventLis
 
         Sensor mAccelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         Sensor mGyroscope = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
-        mSensorManager.registerListener(this, mAccelerometer, SensorManager.SENSOR_DELAY_FASTEST);
-        mSensorManager.registerListener(this, mGyroscope, SensorManager.SENSOR_DELAY_FASTEST);
+        mSensorManager.registerListener(this, mAccelerometer, delay);
+        mSensorManager.registerListener(this, mGyroscope, delay);
     }
 
     private void startTraining(){
@@ -151,8 +154,17 @@ public class SensorGatherService extends IntentService implements SensorEventLis
      ...
      O boi*/
 
+    private static Boolean skip = false;
+
     @Override
     public void onSensorChanged(SensorEvent event) {
+        /*if(skip){
+            skip = false;
+            Log.d(TAG, "S");
+            return;
+        }
+        Log.d(TAG, "NS");
+        skip = true;*/
         TimeBase offset = sensorOffsets.get(event.sensor.getType());
         if(offset == null){
             offset = new TimeBase(System.currentTimeMillis(), event.timestamp);
@@ -167,26 +179,19 @@ public class SensorGatherService extends IntentService implements SensorEventLis
             events.add(new SensorEventData(event, offset));
             if(events.size() > WINDOW_SIZE){
                 events.remove(0);
-            }
-
-            if(events.size() == WINDOW_SIZE){
                 final SensorEventData[] events_a = events.toArray(new SensorEventData[0]);
 
                 EventWindowFeatures features = new EventWindowFeatures(events_a, false);
 
-                EventWindowFeatures[] features_a = null;
-                synchronized (eventFeatures) {
-                    eventFeatures.add(features);
-                    if(eventFeatures.size() >= 1000){
-                        features_a =
-                                eventFeatures.toArray(new EventWindowFeatures[0]);
-                        eventFeatures = new ArrayList<>();
+
+
+                eventFeatures.add(features);
+                if(eventFeatures.size() >= 500){
+                    final EventWindowFeatures[] features_a =
+                            eventFeatures.toArray(new EventWindowFeatures[0]);
                         //send features_a via network
 
-                    }
-                }
-                if(features_a != null) {
-                    final EventWindowFeatures[] features_a_final = features_a;
+
                     Thread t = new Thread(new Runnable() {
                         @Override
                         public void run() {
@@ -194,7 +199,7 @@ public class SensorGatherService extends IntentService implements SensorEventLis
                             //send features via network
                             StringBuilder sb = new StringBuilder();
                             sb.append(EventWindowFeatures.getCSVHeader());
-                            for (EventWindowFeatures feature : features_a_final) {
+                            for (EventWindowFeatures feature : features_a) {
                                 sb.append(feature.toCSV());
                             }
                             NetworkWorker.sendString(NetworkWorker.Urls.PREDICT_TAPS, sb.toString(), false);
@@ -202,7 +207,10 @@ public class SensorGatherService extends IntentService implements SensorEventLis
                         }
                     });
                     t.start();
+
+                    eventFeatures = new ArrayList<>();
                 }
+
             }
 
         }
@@ -268,6 +276,7 @@ public class SensorGatherService extends IntentService implements SensorEventLis
         System.arraycopy(during.toArray(new SensorEventData[0]), 0, events, startDuringPos,
                 endDuringPos - startDuringPos);
         System.arraycopy(after.toArray(new SensorEventData[0]), 0, events, endDuringPos, after.size());
+        Log.d(TAG, Integer.toString(events.length));
         EventWindowFeatures[] features = new EventWindowFeatures[events.length - WINDOW_SIZE];
         Log.d(TAG, Integer.toString(startDuringPos) + " " + Integer.toString(endDuringPos) + " " +
                 Integer.toString(events.length));
