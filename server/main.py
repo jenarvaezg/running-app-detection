@@ -7,6 +7,9 @@ import graphlab
 import os
 import tempfile
 import random
+import threading
+import collections
+import Queue
 
 from StringIO import StringIO
 import pandas as pd
@@ -14,16 +17,84 @@ import pandas as pd
 import models_config
 import numpy as np
 
-graphlab.SFrame() #so frapglab really starts now
-
 
 models = {}
+
+class Predictor():
+
+    def __init__(self, user):
+        self.user = user
+        self.queue = Queue.Queue()
+        self.noise_model = models[self.user]['noise']
+        self.type_model = models[self.user]['type'] 
+        self.touch_model = models[self.user]['touch']
+        self.swipe_model = models[self.user]['swipe']
+        self.lock = threading.Lock
+        self.lock.acquire()
+
+    def get_prediction(self):
+        self.lock.acquire()
+        self.lock.release()
+
+
+    def _loop(self):
+        while(True):
+            sf = self.queue.get(block=True)
+            if type(sf) == str:
+                print "si ya saben como me pongo pa que me invitan"
+                return
+
+        # Look at all this dead code holy shit
+        """self.lock.release()
+
+
+    	noise_predictions = noise_model.predict(taps_sf)
+        if (noise_predictions == 1).all():
+		    print "ALL NOISE"
+        return
+		
+        noise_before = False
+        for i in range(len(taps_sf)): 
+            if noise_predictions[i]:
+	            if not noise_before:
+	                result.append("NOISE")
+    			noise_before = True
+	    	    continue
+            noise_before = False
+            if type_model.predict(taps_sf[i])[0] == "SWIPE":
+                result.append(swipe_model.predict(taps_sf[i])[0])
+            else:
+                result.append(touch_model.predict(taps_sf[i])[0])
+
+    	if result[-1] != "NOISE":
+	        result.append("NOISE")
+    	words = []
+        noise_positions = [i for i, x in enumerate(result) if x == "NOISE"]
+        print noise_positions	
+        for i in range(len(noise_positions) -1):
+            start, end = noise_positions[i] + 1, noise_positions[i+1]
+            detections = result[start:end]
+            counter = collections.Counter(detections)
+            print counter.most_common()
+            words.append(counter.most_common()[0][0])
+	    
+
+	    print words
+        print result""" 
+
+
+        print "nigga bye"
+
+    def start(self):
+         t = threading.Thread(target=self._loop)
+         t.start()
+         return t
+
 
 # RequestHandler class
 class RequestHandler(BaseHTTPRequestHandler):
 
-
-
+    
     def get_msg(self, compressed=False):
         blob = self.rfile.read(int(self.headers['Content-Length']))
 	if not compressed:
@@ -52,13 +123,13 @@ class RequestHandler(BaseHTTPRequestHandler):
         path = "data/" + self.user + "_taps.csv"
         user_taps_sf = graphlab.SFrame.read_csv(path)
         print user_taps_sf
-
+        print len(user_taps_sf), "TOTAL"
         not_noise = user_taps_sf[user_taps_sf['noise'] == 0]
-	print len(not_noise), "NOT_NOISE"
+        print len(not_noise), "NOT_NOISE"
         swipes = not_noise[not_noise['type'] == "SWIPE"]
-	print len(swipes), "SWIPES"
+        print len(swipes), "SWIPES"
         touches = not_noise[not_noise['type'] == "TOUCH"]
-	print len(touches), "TOUCHES"
+        print len(touches), "TOUCHES"
         noise_model = graphlab.boosted_trees_classifier.create(user_taps_sf,
                                                             target="noise",
                                                             features=models_config.features,
@@ -84,43 +155,23 @@ class RequestHandler(BaseHTTPRequestHandler):
         type_model.save("models/" + self.user + "_type_model")
         swipe_model.save("models/" + self.user + "_swipe_model")
         touch_model.save("models/" + self.user + "_touch_model")
-	load_models()
+    	load_models()
 
 
 
     def predict_taps(self):
-	print "GOOOO"
-	df = pd.read_csv(self.rfile)
-	taps_sf = graphlab.SFrame(df)
-        noise_model = models[self.user]['noise'] #graphlab.load_model("models/" + self.user + "_noise_model")
-        type_model = models[self.user]['type'] #graphlab.load_model("models/" + self.user + "_type_model")
-        touch_model = models[self.user]['touch'] #graphlab.load_model("models/" + self.user + "_touch_model")
-        swipe_model = models[self.user]['swipe'] #graphlab.load_model("models/" + self.user + "_swipe_model")
-	print "models loaded"
-        result = []
+        predictor = Predictor(self.user)
 
-	noise_predictions = noise_model.predict(taps_sf)
-	if (noise_predictions == 1).all():
-		print "ALL NOISE"
-		return
-		
-	noise_before = False
-        for i in range(len(taps_sf)): 
-	    if noise_predictions[i]:
-		if not noise_before:
-	                result.append("NOISE")
-			noise_before = True
-		continue
-	    noise_before = False
-            if type_model.predict(taps_sf[i])[0] == "SWIPE":
-                result.append(swipe_model.predict(taps_sf[i])[0])
-            else:
-                result.append(touch_model.predict(taps_sf[i])[0])
-	
+        predictor_thread = predictor.start()
 
-	
-        print result
-
+        names = self.rfile.readline().rstrip().split(",")
+        for line in self.rfile:
+            splitted = [[float(x)] for x in line.rstrip().split(",")] # god damnit graphlab
+            d = dict(zip(names, splitted))
+            sf = graphlab.SFrame(d)
+            predictor.queue.put_nowait(sf)
+        return 
+        
     def do_POST(self):
         c = Cookie.SimpleCookie()
         try:
@@ -184,7 +235,6 @@ def run():
   print('starting server...')
 
   server_address = ('0.0.0.0', 8081)
-  #httpd = HTTPServer(server_address, HTTPServer_RequestHandler)
   server = ThreadedHTTPServer(server_address, RequestHandler)
   print('running server...')
   load_models()
