@@ -144,12 +144,12 @@ public class SensorGatherService extends IntentService implements SensorEventLis
         Long end = b.getLong("END");
         final Collection<SensorEventData> before, during, after;
         synchronized (EventStack.class) {
-            before = eventStack.getInRange(start - ((end-start) * 2), start);
+            before = eventStack.getInRange(start - ((end-start) ), start);
             //before = eventStack.getBefore(start); too much noise
             during = eventStack.getInRange(start, end);
         }
         try {
-            Thread.sleep((end-start) * 2); //wait a bit to collect after touch events
+            Thread.sleep((end-start)); //wait a bit to collect after touch events
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -195,7 +195,7 @@ public class SensorGatherService extends IntentService implements SensorEventLis
         System.arraycopy(after.toArray(new SensorEventData[after.size()]), 0, events, endDuringPos, after.size());
         EventWindowFeatures[] features = new EventWindowFeatures[events.length - WINDOW_SIZE];
         for(int i = 0; i < events.length - WINDOW_SIZE; i++){
-            String when = i + WINDOW_SIZE / 2 < startDuringPos ? "BEFORE" : i + WINDOW_SIZE / 2 <
+            String when = i + WINDOW_SIZE - 1 < startDuringPos ? "BEFORE" : i + WINDOW_SIZE - 1 <
                     endDuringPos ? "DURING" : "AFTER";
             SensorEventData[] thisWindowEvents = Arrays.copyOfRange(events, i, i+WINDOW_SIZE);
             EventWindowFeatures thisWindowFeatures = new EventWindowFeatures(thisWindowEvents, true);
