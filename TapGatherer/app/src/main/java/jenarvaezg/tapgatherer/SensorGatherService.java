@@ -7,12 +7,15 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+
+import jenarvaezg.tapgatherer.NetworkWorker.Urls;
 
 
 public class SensorGatherService extends IntentService implements SensorEventListener {
@@ -30,10 +33,12 @@ public class SensorGatherService extends IntentService implements SensorEventLis
     protected static final String ACTION_TRAIN = "TRAIN";
     protected static final String ACTION_STOP = "STOP";
     protected static final String ACTION_STORE_TOUCH_EVENT = "STORE";
-    private static Boolean predicting = false;
-    private static Boolean training = false;
+    private static Boolean trainingTaps = false;
+    private static Boolean trainingApps = false;
+    private static Boolean stopped = true;
 
     private static SensorManager mSensorManager;
+    private static SensorEventListener listener;
 
     private static EventStack eventStack;
 
@@ -56,6 +61,8 @@ public class SensorGatherService extends IntentService implements SensorEventLis
         NetworkWorker.externalFilesDir = getExternalFilesDir(null);
         if (intent != null) {
             final String action = intent.getAction();
+            final String type = intent.getType();
+            final String app = type != null ? intent.getStringExtra("APP") : null;
             Log.d(TAG, "GOT ACTION " + action);
             if (ACTION_START.equals(action)) {
                 Log.d(TAG, "Go!");
@@ -64,27 +71,50 @@ public class SensorGatherService extends IntentService implements SensorEventLis
                 storeTouchEvent(bundle);
             }else if(ACTION_STOP.equals(action)) {
                 stopSensors();
-                if(training){
-                    sendTrainCommand();
-                }else if(predicting){
+                if(trainingTaps) {
+                    sendTrainTapsCommand();
+                    trainingTaps = false;
+                }else if(trainingApps){
+                    sendTrainAppsCommand();
+                    trainingApps = false;
+                }else{
                     featureWorker.stop();
                 }
-
-                // TODO events = new ArrayList<>();
-                // eventFeatures = new ArrayList<>();
-                training = false;
-                predicting = false;
-            }else if(ACTION_TRAIN.equals(action)) {
+            }else if(ACTION_TRAIN.equals(action) && "TAPS".equals(type)) {
+                stopped = false;
                 startSensors(SensorManager.SENSOR_DELAY_FASTEST);
-                startTraining();
+                trainingTaps = true;
+            }else if(ACTION_TRAIN.equals(action) && "APPS".equals(type)) {
+                stopped = false;
+                startSensors(SensorManager.SENSOR_DELAY_FASTEST);
+                trainingApps = true;
+                featureWorker = new FeatureWorker(Urls.TRAIN_APPS, EventWindowFeatures.getTrainingAppsCSVHeader(), app);
             }else if(ACTION_PREDICT.equals(action)){
+                stopped = false;
+                Urls url = "TAPS".equals(type) ? Urls.PREDICT_TAPS : Urls.PREDICT_APPS;
                 startSensors(SensorManager.SENSOR_DELAY_FASTEST);
-                featureWorker = new FeatureWorker();
-                predicting = true;
-            }else{
-                Log.wtf(TAG, "DUDE WHAT '" + action + "'");
+                featureWorker = new FeatureWorker(url, EventWindowFeatures.getPredictingCSVHeader(), null);
+            } else {
+                Log.wtf(TAG, "DUDE WHAT '" + action + "' '" + type + "'");
             }
+            launchApp(app);
         }
+    }
+
+    private void launchApp(String app){
+        if(app == null){
+            return;
+        }
+        Intent intent = new Intent();
+        if(app.equals("whatsapp")){
+            intent = getPackageManager().getLaunchIntentForPackage("com.whatsapp");
+        }else if(app.equals("facebook")){
+            String uri = "facebook://facebook.com/inbox";
+            intent = new Intent(Intent.ACTION_VIEW, Uri.parse(uri));
+        }
+
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(intent);
     }
 
     private void startSensors(Integer delay){
@@ -97,17 +127,14 @@ public class SensorGatherService extends IntentService implements SensorEventLis
         Sensor mGyroscope = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
         mSensorManager.registerListener(this, mAccelerometer, delay);
         mSensorManager.registerListener(this, mGyroscope, delay);
+        listener = this;
     }
 
-    private void startTraining(){
-        training = true;
-    }
 
     private void stopSensors(){
-        mSensorManager.unregisterListener(this);
+        mSensorManager.unregisterListener(listener);
+        stopped = true;
     }
-
-    //TODO fix training so we get features instead of raw
 
     /*The timestamps are not defined as being the Unix time;
     they're just "a time" that's only valid for a given sensor.
@@ -115,20 +142,24 @@ public class SensorGatherService extends IntentService implements SensorEventLis
      ...
      O boi*/
 
+    Integer counter = 0;
 
     @Override
     public void onSensorChanged(SensorEvent event) {
+        counter ++;
+        if((counter % 100) == 0){
+            Log.d(TAG, "ALIVE");
+        }
         TimeBase offset = sensorOffsets.get(event.sensor.getType());
         if(offset == null){
             offset = new TimeBase(System.currentTimeMillis(), event.timestamp);
             sensorOffsets.put(event.sensor.getType(), offset);
         }
-        if (training) {
+        if (trainingTaps) {
             eventStack.put((event.timestamp - offset.timestampBase) / 1000000L + offset.dateBase,
                         new SensorEventData(event, offset));
-        }else if(predicting){
+        }else if(!stopped){
             featureWorker.externalEventsQueue.add(new SensorEventData(event, offset));
-
         }
     }
 
@@ -137,19 +168,19 @@ public class SensorGatherService extends IntentService implements SensorEventLis
     public void onAccuracyChanged(Sensor sensor, int accuracy) { }
 
     private void storeTouchEvent(Bundle b){
-        if(!training){
+        if(!trainingTaps){
             return;
         }
         Long start = b.getLong("START");
         Long end = b.getLong("END");
         final Collection<SensorEventData> before, during, after;
         synchronized (EventStack.class) {
-            before = eventStack.getInRange(start - ((end-start) * 2), start);
+            before = eventStack.getInRange(start - ((end-start) ), start);
             //before = eventStack.getBefore(start); too much noise
             during = eventStack.getInRange(start, end);
         }
         try {
-            Thread.sleep((end-start) * 2); //wait a bit to collect after touch events
+            Thread.sleep((end-start)); //wait a bit to collect after touch events
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -167,7 +198,7 @@ public class SensorGatherService extends IntentService implements SensorEventLis
                         before, during, after);
                 //send features via network
                 StringBuilder sb = new StringBuilder();
-                sb.append(EventWindowFeatures.getTrainingCSVHeader());
+                sb.append(EventWindowFeatures.getTrainingTapsCSVHeader());
                 for(EventWindowFeatures feature: features){
                     sb.append(feature.toCSV());
                 }
@@ -195,10 +226,10 @@ public class SensorGatherService extends IntentService implements SensorEventLis
         System.arraycopy(after.toArray(new SensorEventData[after.size()]), 0, events, endDuringPos, after.size());
         EventWindowFeatures[] features = new EventWindowFeatures[events.length - WINDOW_SIZE];
         for(int i = 0; i < events.length - WINDOW_SIZE; i++){
-            String when = i + WINDOW_SIZE / 2 < startDuringPos ? "BEFORE" : i + WINDOW_SIZE / 2 <
+            String when = i + WINDOW_SIZE - 1 < startDuringPos ? "BEFORE" : i + WINDOW_SIZE - 1 <
                     endDuringPos ? "DURING" : "AFTER";
             SensorEventData[] thisWindowEvents = Arrays.copyOfRange(events, i, i+WINDOW_SIZE);
-            EventWindowFeatures thisWindowFeatures = new EventWindowFeatures(thisWindowEvents, true);
+            EventWindowFeatures thisWindowFeatures = new EventWindowFeatures(thisWindowEvents, true, null);
             thisWindowFeatures.setLabels(when, eventAction, eventType);
             features[i] = thisWindowFeatures;
         }
@@ -209,10 +240,12 @@ public class SensorGatherService extends IntentService implements SensorEventLis
     }
 
 
-    private void sendTrainCommand(){
-        Log.d(TAG, "SENDING TRAIN TAPS");
+    private void sendTrainTapsCommand(){
         NetworkWorker.sendString(NetworkWorker.Urls.TRAIN_TAPS, "", true);
-        Log.d(TAG, "MODEL READY");
+    }
+
+    private void sendTrainAppsCommand(){
+        NetworkWorker.sendString(NetworkWorker.Urls.TRAIN_TAPS, "", true);
     }
 
 }
