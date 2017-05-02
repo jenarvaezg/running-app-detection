@@ -88,7 +88,7 @@ public class SensorGatherService extends IntentService implements SensorEventLis
                 stopped = false;
                 startSensors(SensorManager.SENSOR_DELAY_FASTEST);
                 trainingApps = true;
-                featureWorker = new FeatureWorker(Urls.TRAIN_APPS, EventWindowFeatures.getTrainingAppsCSVHeader(), app);
+                featureWorker = new FeatureWorker(Urls.UPDATE_APPS, EventWindowFeatures.getTrainingAppsCSVHeader(), app);
             }else if(ACTION_PREDICT.equals(action)){
                 stopped = false;
                 Urls url = "TAPS".equals(type) ? Urls.PREDICT_TAPS : Urls.PREDICT_APPS;
@@ -245,7 +245,7 @@ public class SensorGatherService extends IntentService implements SensorEventLis
     }
 
     private void sendTrainAppsCommand(){
-        NetworkWorker.sendString(NetworkWorker.Urls.TRAIN_TAPS, "", true);
+        NetworkWorker.sendString(NetworkWorker.Urls.TRAIN_APPS, "", true);
     }
 
 }
