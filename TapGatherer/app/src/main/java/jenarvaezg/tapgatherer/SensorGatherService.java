@@ -7,6 +7,7 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import java.util.Arrays;
@@ -33,9 +34,11 @@ public class SensorGatherService extends IntentService implements SensorEventLis
     protected static final String ACTION_STOP = "STOP";
     protected static final String ACTION_STORE_TOUCH_EVENT = "STORE";
     private static Boolean trainingTaps = false;
+    private static Boolean trainingApps = false;
     private static Boolean stopped = true;
 
     private static SensorManager mSensorManager;
+    private static SensorEventListener listener;
 
     private static EventStack eventStack;
 
@@ -68,19 +71,23 @@ public class SensorGatherService extends IntentService implements SensorEventLis
                 storeTouchEvent(bundle);
             }else if(ACTION_STOP.equals(action)) {
                 stopSensors();
-                if(trainingTaps){
+                if(trainingTaps) {
                     sendTrainTapsCommand();
                     trainingTaps = false;
+                }else if(trainingApps){
+                    sendTrainAppsCommand();
+                    trainingApps = false;
                 }else{
                     featureWorker.stop();
                 }
             }else if(ACTION_TRAIN.equals(action) && "TAPS".equals(type)) {
                 stopped = false;
                 startSensors(SensorManager.SENSOR_DELAY_FASTEST);
-                startTrainingTaps();
+                trainingTaps = true;
             }else if(ACTION_TRAIN.equals(action) && "APPS".equals(type)) {
                 stopped = false;
                 startSensors(SensorManager.SENSOR_DELAY_FASTEST);
+                trainingApps = true;
                 featureWorker = new FeatureWorker(Urls.TRAIN_APPS, EventWindowFeatures.getTrainingAppsCSVHeader(), app);
             }else if(ACTION_PREDICT.equals(action)){
                 stopped = false;
@@ -90,7 +97,24 @@ public class SensorGatherService extends IntentService implements SensorEventLis
             } else {
                 Log.wtf(TAG, "DUDE WHAT '" + action + "' '" + type + "'");
             }
+            launchApp(app);
         }
+    }
+
+    private void launchApp(String app){
+        if(app == null){
+            return;
+        }
+        Intent intent = new Intent();
+        if(app.equals("whatsapp")){
+            intent = getPackageManager().getLaunchIntentForPackage("com.whatsapp");
+        }else if(app.equals("facebook")){
+            String uri = "facebook://facebook.com/inbox";
+            intent = new Intent(Intent.ACTION_VIEW, Uri.parse(uri));
+        }
+
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(intent);
     }
 
     private void startSensors(Integer delay){
@@ -103,14 +127,12 @@ public class SensorGatherService extends IntentService implements SensorEventLis
         Sensor mGyroscope = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
         mSensorManager.registerListener(this, mAccelerometer, delay);
         mSensorManager.registerListener(this, mGyroscope, delay);
+        listener = this;
     }
 
-    private void startTrainingTaps(){
-        trainingTaps = true;
-    }
 
     private void stopSensors(){
-        mSensorManager.unregisterListener(this);
+        mSensorManager.unregisterListener(listener);
         stopped = true;
     }
 
@@ -120,9 +142,14 @@ public class SensorGatherService extends IntentService implements SensorEventLis
      ...
      O boi*/
 
+    Integer counter = 0;
 
     @Override
     public void onSensorChanged(SensorEvent event) {
+        counter ++;
+        if((counter % 100) == 0){
+            Log.d(TAG, "ALIVE");
+        }
         TimeBase offset = sensorOffsets.get(event.sensor.getType());
         if(offset == null){
             offset = new TimeBase(System.currentTimeMillis(), event.timestamp);
@@ -214,9 +241,11 @@ public class SensorGatherService extends IntentService implements SensorEventLis
 
 
     private void sendTrainTapsCommand(){
-        Log.d(TAG, "SENDING TRAIN TAPS");
         NetworkWorker.sendString(NetworkWorker.Urls.TRAIN_TAPS, "", true);
-        Log.d(TAG, "MODEL READY");
+    }
+
+    private void sendTrainAppsCommand(){
+        NetworkWorker.sendString(NetworkWorker.Urls.TRAIN_TAPS, "", true);
     }
 
 }

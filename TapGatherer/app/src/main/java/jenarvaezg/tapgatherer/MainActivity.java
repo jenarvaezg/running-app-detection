@@ -104,7 +104,7 @@ public class MainActivity extends AppCompatActivity {
                 Spinner appsSpinner = (Spinner) appsDialog.findViewById(R.id.apps_spinner);
 
                 final String[] apps = new String[] {
-                        "facebook", "whatsapp"
+                        "app to launch", "facebook", "whatsapp"
                 };
                 ArrayAdapter<String> adapter = new ArrayAdapter<>(MainActivity.this, android.R.layout.simple_spinner_item, apps);
                 appsSpinner.setAdapter(adapter);
@@ -114,6 +114,7 @@ public class MainActivity extends AppCompatActivity {
                     Boolean first = true;
                     @Override
                     public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                        Log.d(TAG, "FIRST? " + Boolean.toString(first) + " position: " + Integer.toString(position));
                         if (first){
                             first = false;
                             return;
@@ -125,7 +126,7 @@ public class MainActivity extends AppCompatActivity {
 
                     @Override
                     public void onNothingSelected(AdapterView<?> parent) {
-
+                        Log.wtf(TAG, "NOTHING");
                     }
                 });
 
