@@ -25,8 +25,10 @@ public class EventWindowFeatures{
     private Boolean isLabeled = false;
     private String when, action, type;
     private Integer noise = 0;
+    private String app;
 
-    EventWindowFeatures(SensorEventData[] events, Boolean isLabeled){
+    EventWindowFeatures(SensorEventData[] events, Boolean isLabeled, String app){
+        this.app = app;
         this.isLabeled = isLabeled;
         final ArrayList<SensorEventData> gyroEvents = new ArrayList<>();
         final ArrayList<SensorEventData> accelEvents = new ArrayList<>();
@@ -139,9 +141,18 @@ public class EventWindowFeatures{
                 "gyro_z_skewness,gyro_z_kurtosis,gyro_z_diff\n";
     }
 
-    public static String getTrainingCSVHeader() {
+    public static String getTrainingTapsCSVHeader() {
         String base = getCSVHeader();
         return base.substring(0, base.length() - 1) + ",when,noise,type,action\n";
+    }
+
+    public static String getTrainingAppsCSVHeader() {
+        String base = getCSVHeader();
+        return base.substring(0, base.length() - 1) + ",app\n";
+    }
+
+    public static String getPredictingCSVHeader(){
+        return getCSVHeader();
     }
 
     String toCSV() {
@@ -155,6 +166,9 @@ public class EventWindowFeatures{
         if(isLabeled){
             sb.append(",").append(when).append(",").append(noise).append(",").
                     append(type).append(",").append(action);
+        }
+        if(app != null){
+            sb.append(",").append(app);
         }
         sb.append("\n");
         return sb.toString();
