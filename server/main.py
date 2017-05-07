@@ -11,24 +11,141 @@ import threading
 import collections
 import Queue
 
+from collections import Counter
 from StringIO import StringIO
 import pandas as pd
 
 import models_config
-import numpy as np
 
 
 models = {}
 
-class Predictor():
+class AppPredictor():
 
-    def __init__(self, user):
+    def __init__(self):
+        self.user = user
+        self.queue = Queue.Queue()
+        self.apps_sfs = self.load_apps_sfs()
+
+
+    def _loop(self):
+        received = []
+        while(True):
+            word = self.queue.get(block=True)
+            if word == "BYE":
+                print "And the last one leaves"
+                return
+            # and magic happens here
+
+
+    def load_apps_sf(self):
+        path = "data/" + self.user + "_apps.csv"
+        apps_sf = graphlab.SFrame.read_csv(path)
+        for app in apps_sf['app'].unique():
+            this_app_sf = apps_sf[apps_sf['app'] == app]
+            # do stuff here so we get bag of words and so on
+
+    def start(self):
+        t = threading.Thread(target = self._loop)
+        t.start()
+        return t
+
+
+
+class Compressor():
+
+    MAX_CONSECUTIVE_NOISE = 10
+    MAX_CONSECUTIVE_NOT_NOISE = 10
+    MAX_BLOCK_SIZE = 30
+
+    def __init__(self, user, mode):
+        self.user = user
+        self.mode = mode
+        self.queue = Queue.Queue()
+        self.lock = threading.Lock() # Maybe wont use
+
+    def get_more_commons(self, block):
+        l = len(block)
+        if l > Compressor.MAX_BLOCK_SIZE:
+            left = self.get_more_commons(block[:l/2])
+            right = self.get_more_commons(block[l/2:])
+            return left + right
+        data = Counter(block)
+        return [data.most_common(1)[0][0]]
+
+    def pass_compressed(self, compressed):
+        if mode == "PREDICT TAPS":
+            print "\n".join(compressed)
+        elif mode == "UPDATE APPS":
+            path = "data/" + self.user + "_apps.csv"
+            if not os.path.isfile(path): #user doesn't have data
+                with open(path, "w") as f:
+                    f.write("word, app\n")
+            with open(path, "a") as f:
+                for word in compressed:
+                    f.write(word + "," + self.app + "\n")
+        elif mode == "PREDICT APPS":
+            for word in compressed:
+                self.app_predictor.queue.put_nowait(word)
+
+        
+    
+    def _loop(self):
+        n_noise = 0
+        n_not_noise = 0
+        in_noise_block = True
+        current_block = []
+        result = []
+        while(True):
+            sf = self.queue.get(block=True)
+            if type(sf) == str:
+                print "otro que se va"
+                if self.app_predictor:
+                    self.app_predictor.queue.put_nowait("BYE")
+                return
+            print sf["prediction"], n_noise, n_not_noise, in_noise_block, current_block, result
+            if sf["prediction"][0] == "NOISE": # if we get noise
+                if in_noise_block: # and we are in a noise block
+                    n_not_noise = 0 # reset not_noise counter
+                    current_block = [] # reset block just in case
+                    continue # and keep reading
+                n_noise += 1 #otherwise we are in an event block, add to noise_counter
+                if n_noise >= Compressor.MAX_CONSECUTIVE_NOISE: # if we have enough consecutive noise
+                    compressed = self.get_more_commons(current_block) # get compressed
+                    result.extend(compressed) # add to compressed result
+                    self.pass_compressed(compressed) # pass compressed
+                    in_noise_block = True # go back to being in a noise block
+                    n_noise = n_not_noise = 0 # reset counters
+                    current_block = [] # and reset current block
+            else: # if we get something that is not noise
+                current_block.append(sf["prediction"][0]) # add to posibly current block
+                if in_noise_block: # if we are in a block of noise
+                    n_not_noise += 1 # add to not_noise_counter
+                    if n_not_noise >= Compressor.MAX_CONSECUTIVE_NOT_NOISE: # if we have enough consecutive not noise
+                        in_noise_block = False # leave noise block state
+                        n_noise = n_not_noise = 0 # reset counter
+                else: # if we are not in a noise block
+                    n_noise = 0 #reset noise counter                    
+
+    def start(self):
+        t = threading.Thread(target = self._loop)
+        t.start()
+        if mode == "PREDICT_APPS":
+            self.app_predictor = AppPredictor(self.user)
+            self.app_predictor_t = self.app_predictor.start()
+        return t
+        
+
+class TapPredictor():
+
+    def __init__(self, user, mode):
         self.user = user
         self.queue = Queue.Queue()
         self.noise_model = models[self.user]['noise']
         self.type_model = models[self.user]['type'] 
         self.touch_model = models[self.user]['touch']
         self.swipe_model = models[self.user]['swipe']
+        self.mode = mode
         self.lock = threading.Lock()
         self.lock.acquire()
 
@@ -36,58 +153,34 @@ class Predictor():
         self.lock.acquire()
         self.lock.release()
 
+    def set_app(self, app):
+        self.app = app
+        compressor.app = app
 
     def _loop(self):
         while(True):
             sf = self.queue.get(block=True)
             if type(sf) == str:
                 print "si ya saben como me pongo pa que me invitan"
+                self.compressor.queue.put_nowait(sf) # sf is actually a string
                 return
-
-        # Look at all this dead code holy shit
-        """self.lock.release()
-
-
-    	noise_predictions = noise_model.predict(taps_sf)
-        if (noise_predictions == 1).all():
-		    print "ALL NOISE"
-        return
-		
-        noise_before = False
-        for i in range(len(taps_sf)): 
-            if noise_predictions[i]:
-	            if not noise_before:
-	                result.append("NOISE")
-    			noise_before = True
-	    	    continue
-            noise_before = False
-            if type_model.predict(taps_sf[i])[0] == "SWIPE":
-                result.append(swipe_model.predict(taps_sf[i])[0])
+            if self.noise_model.predict(sf)[0]: #noise
+                sf["prediction"] = "NOISE"
             else:
-                result.append(touch_model.predict(taps_sf[i])[0])
-
-    	if result[-1] != "NOISE":
-	        result.append("NOISE")
-    	words = []
-        noise_positions = [i for i, x in enumerate(result) if x == "NOISE"]
-        print noise_positions	
-        for i in range(len(noise_positions) -1):
-            start, end = noise_positions[i] + 1, noise_positions[i+1]
-            detections = result[start:end]
-            counter = collections.Counter(detections)
-            print counter.most_common()
-            words.append(counter.most_common()[0][0])
-	    
-
-	    print words
-        print result""" 
-
-
+                e_type = self.type_model.predict(sf)[0]
+                if e_type == "SWIPE":
+                    sf["prediction"] = self.swipe_model.predict(sf)[0]
+                else:
+                    sf["prediction"] = self.touch_model.predict(sf)[0]
+            self.compressor.queue.put_nowait(sf)
+            
         print "nigga bye"
 
     def start(self):
          t = threading.Thread(target=self._loop)
          t.start()
+         self.compressor = Compressor(self.user, self.mode)
+         self.compressor_thread = self.compressor.start()
          return t
 
 
@@ -121,13 +214,18 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.save_msg_to_file(path)
 
     def update_apps(self):
-        path = "data/" + self.user + "_apps.csv"
-        with open(path, 'a') as f:
-            RequestHandler.apps_file_mutex.acquire()
-            for line in self.rfile:
-                print line
-                f.write(line)
-            RequestHandler.apps_file_mutex.release()
+        predictor = TapPredictor(self.user, "UPDATE APPS")
+        predictor_thread = predictor.start()
+
+        names = self.rfile.readline().rstrip().split(",")
+        for line in self.rfile:
+            splitted = [[float(x)] for x in line.rstrip().split(",")] # god damnit graphlab
+            d = dict(zip(names, splitted))
+            sf = graphlab.SFrame(d)
+            predictor.queue.put_nowait(sf)
+            predictor.queue.put_nowait("BYE")
+            predictor_thread.join()
+        return
 
     def train_taps(self):
         path = "data/" + self.user + "_taps.csv"
@@ -168,41 +266,23 @@ class RequestHandler(BaseHTTPRequestHandler):
     	load_models()
 
     def train_apps(self):
-        # all this might change, I might want to use the same code as the predictor up there 
-        path = "data/" + self.user + "_taps.csv"
-        user_taps_sf = graphlab.SFrame.read_csv(path)
-    
-        noise_model = models[self.user]['noise']
-        type_model = models[self.user]['type']
-        touch_model = models[self.user]['touch']
-        swipe_model = models[self.user]['swipe']
-
-        for sf in user_taps_sf:
-            if noise_model.predict(sf) == 1:
-                sf['word'] = "NOISE"
-                continue
-            if type_model.predict(sf) == "SWIPE":
-                sf['word'] = swipe_model.predict(sf)
-            else:
-                sf['word'] = touch_model.predict(sf)
         return
-
-        for app in sf['app'].unique():
+        #doesn't work yet
+        # all this might change, I might want to use the same code as the predictor up there 
             compressed = compress(user_taps_sf[user_taps_sf['app' == app]])
             word_count = graphlab.text_analytics.count_words(compressed)
             
 
-        corups_words = graphlab.SFrame([
-        compressed_sf = compress(user_taps_sf) #this should be and sf with only words and app
+        #corups_words = graphlab.SFrame([i
+        #compressed_sf = compress(user_taps_sf) #this should be and sf with only words and app
         # somewhere, pass it to bag of words
-        comppressed_sf['tfidf'] = graphlab
+        #comppressed_sf['tfidf'] = graphlab
 
 
 
 
     def predict_taps(self):
-        predictor = Predictor(self.user)
-
+        predictor = TapPredictor(self.user, "PREDICT TAPS")
         predictor_thread = predictor.start()
 
         names = self.rfile.readline().rstrip().split(",")
@@ -211,6 +291,8 @@ class RequestHandler(BaseHTTPRequestHandler):
             d = dict(zip(names, splitted))
             sf = graphlab.SFrame(d)
             predictor.queue.put_nowait(sf)
+        predictor.queue.put_nowait("BYE")
+        predictor_thread.join()
         return 
         
     def do_POST(self):
