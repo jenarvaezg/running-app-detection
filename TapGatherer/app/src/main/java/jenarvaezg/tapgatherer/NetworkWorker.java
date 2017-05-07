@@ -9,28 +9,19 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.ProtocolException;
 import java.net.Socket;
 import java.net.URL;
-import java.net.URLEncoder;
 import java.security.SecureRandom;
-import java.text.DateFormat;
-import java.util.Date;
 import java.util.HashMap;
-import java.util.Random;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.zip.GZIPOutputStream;
 
-/**
- * Created by jose on 4/13/17.
- */
+
 public class NetworkWorker implements Runnable {
 
     private static final String TAG = "NetworkWorker";
@@ -57,28 +48,18 @@ public class NetworkWorker implements Runnable {
         return hm;
     }
 
-    private InputStreamReader isr;
-    private OutputStream os;
     private Thread thread;
-    private HttpURLConnection conn;
+    private String url;
     LinkedBlockingQueue<String> toSendQueue;
 
     private Socket socket;
 
-    public NetworkWorker(Urls urlEnum) throws IOException {
-        String url = base_url +  urls.get(urlEnum);
+    public NetworkWorker(Urls url) throws IOException {
 
-        /*URL u = new URL(url);
-        this.conn = (HttpURLConnection) u.openConnection();
-        this.conn.setDoOutput(true);
-        this.conn.setDoInput(true);
-        this.conn.setRequestProperty("Content-Type", "text/csv");
-        this.conn.setRequestProperty("Cookie", getCookie());
-        this.conn.setRequestMethod("POST");*/
         this.toSendQueue = new LinkedBlockingQueue<>();
 
         socket = new Socket(serverName, serverPort);
-
+        this.url = urls.get(url);
         this.thread  = new Thread(this);
         this.thread.start();
     }
@@ -86,11 +67,9 @@ public class NetworkWorker implements Runnable {
     @Override
     public void run() {
         try {
-            //this.os = conn.getOutputStream();
-
             DataOutputStream outToServer = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
             BufferedReader inFromServer = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            outToServer.writeBytes("POST /predict_taps HTTP/1.1\n");
+            outToServer.writeBytes("POST " + this.url + " HTTP/1.1\n");
             outToServer.writeBytes("Cookie: " + getCookie() + "\n");
             outToServer.writeBytes("\n");
             outToServer.flush();
