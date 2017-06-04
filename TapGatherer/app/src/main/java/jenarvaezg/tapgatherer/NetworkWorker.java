@@ -24,7 +24,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 public class NetworkWorker implements Runnable {
 
-    private static final String TAG = "NetworkWorker";
+    private static final String TAG = "NETWORKWORKER";
     private static final String base_url = "http://jenarvaezgvps.ddns.net:8081";
     private static final String serverName = "jenarvaezgvps.ddns.net";
     private static final Integer serverPort = 8081;
@@ -51,6 +51,7 @@ public class NetworkWorker implements Runnable {
     private Thread thread;
     private String url;
     LinkedBlockingQueue<String> toSendQueue;
+    private DataOutputStream outToServer;
 
     private Socket socket;
 
@@ -67,7 +68,7 @@ public class NetworkWorker implements Runnable {
     @Override
     public void run() {
         try {
-            DataOutputStream outToServer = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
+            outToServer = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
             BufferedReader inFromServer = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             outToServer.writeBytes("POST " + this.url + " HTTP/1.1\n");
             outToServer.writeBytes("Cookie: " + getCookie() + "\n");
@@ -79,6 +80,11 @@ public class NetworkWorker implements Runnable {
             }
 
         } catch (InterruptedException e) {
+            try {
+                outToServer.close();
+            } catch (IOException e1) {
+                Log.d(TAG, Log.getStackTraceString(e1));
+            }
             Log.d(TAG, Log.getStackTraceString(e));
         } catch (IOException e) {
             Log.d(TAG, Log.getStackTraceString(e));

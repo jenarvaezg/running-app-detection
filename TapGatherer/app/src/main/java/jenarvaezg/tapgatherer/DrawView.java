@@ -23,7 +23,7 @@ public class DrawView extends SurfaceView implements SurfaceHolder.Callback {
     Paint axisPaint = new Paint();
     final static private String TAG = "DrawView";
     Context context;
-    Circle currentCircle;
+    Shape currentShape;
     Boolean surfaceCreated = false;
 
 
@@ -56,35 +56,44 @@ public class DrawView extends SurfaceView implements SurfaceHolder.Callback {
             return;
         }
         drawGrid(canvas);
-        if (currentCircle == null){
-            currentCircle = new Circle(canvas);
+        if (currentShape == null){
+            currentShape = new Circle(canvas);
         }
-        currentCircle.draw(canvas);
+        currentShape.draw(canvas);
         holder.unlockCanvasAndPost(canvas);
     }
 
     private void drawGrid(Canvas canvas){
         Point size = new Point(canvas.getWidth(), canvas.getHeight());
-        canvas.drawLine(0, size.y/2, size.x, size.y/2, axisPaint);
-        canvas.drawLine(size.x/2, 0, size.x/2, size.y, axisPaint);
+        canvas.drawLine(0, size.y/3, size.x, size.y/3, axisPaint);
+        canvas.drawLine(0, size.y / 3 * 2, size.x, size.y / 3 * 2, axisPaint);
+        canvas.drawLine(size.x / 3, 0, size.x / 3, size.y, axisPaint);
+        canvas.drawLine(size.x / 3 * 2, 0, size.x / 3 * 2, size.y, axisPaint);
     }
 
-    private void drawNewCircle(){
+
+    private void drawNewShape(){
+        Random random = new Random(System.currentTimeMillis());
         SurfaceHolder holder = this.getHolder();
         Canvas canvas = holder.lockCanvas();
         canvas.drawColor(Color.BLACK);
         drawGrid(canvas);
-        currentCircle = new Circle(canvas);
-        currentCircle.draw(canvas);
+        if(random.nextInt() % 3 == 0){
+            currentShape = new Arrow(canvas);
+        }else{
+            currentShape = new Circle(canvas);
+        }
+        currentShape.draw(canvas);
         holder.unlockCanvasAndPost(canvas);
+
     }
 
     void testTouch(Point p){
-        if(currentCircle == null){
+        if(currentShape == null){
             return;
         }
-        if (currentCircle.isPointInside(p)){
-            drawNewCircle();
+        if (currentShape.isPointInside(p)){
+            drawNewShape();
         }
     }
 

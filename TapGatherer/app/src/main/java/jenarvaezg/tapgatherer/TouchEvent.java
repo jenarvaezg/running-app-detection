@@ -12,6 +12,8 @@ class TouchEvent extends LinkedList<MotionEvent>{
 
     private static final String TAG = "TOUCH_EVENT";
 
+    private static final Integer TOUCH_THRESHOLD = 10;
+
     TouchEvent(MotionEvent event){
         push(event);
     }
@@ -22,15 +24,13 @@ class TouchEvent extends LinkedList<MotionEvent>{
     }
 
     private Boolean isTouch(){
-        return size() <= 3;
+        return size() <= TOUCH_THRESHOLD;
     }
 
 
     public Boolean isHorizontal(){
         MotionEvent first = getFirst();
         MotionEvent last = getLast();
-        Log.d(TAG, Float.toString(first.getX() - last.getX()) + " " +
-                Float.toString(Math.abs(first.getY() - last.getY())));
         return Math.abs(first.getX() - last.getX()) > Math.abs(first.getY() - last.getY());
     }
 

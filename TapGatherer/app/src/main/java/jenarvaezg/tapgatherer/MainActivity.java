@@ -213,9 +213,6 @@ public class MainActivity extends AppCompatActivity {
             case MotionEvent.ACTION_DOWN:
                 nActions++;
                 currentMotionEvent = new TouchEvent(event);
-                int[] location = new int[2];
-                drawView.getLocationInWindow(location);
-                drawView.testTouch(new Point((int) eventX - location[0], (int) eventY-location[1]));
                 return true;
             case MotionEvent.ACTION_UP:
                 currentMotionEvent.add(event);
@@ -227,6 +224,12 @@ public class MainActivity extends AppCompatActivity {
                 intent.setAction(SensorGatherService.ACTION_STORE_TOUCH_EVENT);
                 startService(intent);
                 Log.d(TAG, intent.getStringExtra("TYPE") + " " + intent.getStringExtra("ACTION"));
+
+
+                int[] location = new int[2];
+                drawView.getLocationInWindow(location);
+                drawView.testTouch(new Point((int) eventX - location[0], (int) eventY - location[1]));
+
                 return true;
             case MotionEvent.ACTION_MOVE:
                 currentMotionEvent.add(event);

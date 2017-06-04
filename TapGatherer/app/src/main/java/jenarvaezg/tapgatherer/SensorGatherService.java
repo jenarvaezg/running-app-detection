@@ -147,7 +147,7 @@ public class SensorGatherService extends IntentService implements SensorEventLis
     @Override
     public void onSensorChanged(SensorEvent event) {
         counter ++;
-        if((counter % 100) == 0){
+        if((counter % 10000) == 0){
             Log.d(TAG, "ALIVE");
         }
         TimeBase offset = sensorOffsets.get(event.sensor.getType());
@@ -179,11 +179,11 @@ public class SensorGatherService extends IntentService implements SensorEventLis
             //before = eventStack.getBefore(start); too much noise
             during = eventStack.getInRange(start, end);
         }
-        try {
+        /*try {
             Thread.sleep((end-start)); //wait a bit to collect after touch events
         } catch (InterruptedException e) {
             e.printStackTrace();
-        }
+        }*/
         //noise after event
         synchronized (EventStack.class){
             after = eventStack.getAfter(end);
