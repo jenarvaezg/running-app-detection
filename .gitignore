@@ -1,2 +1,6 @@
 server/venv/*
+server/env/*
+server/data/*
+server/models/*
+server/*.log
 *.pyc
