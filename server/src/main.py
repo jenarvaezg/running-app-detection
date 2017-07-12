@@ -14,7 +14,7 @@ import sys
 from StringIO import StringIO
 import pandas as pd
 
-import config.models_config
+import config.models_config as models_config
 
 from workers.tap_predictor import TapPredictor
 
