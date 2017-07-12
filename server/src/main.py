@@ -103,22 +103,9 @@ class RequestHandler(BaseHTTPRequestHandler):
         touch_model.save("models/" + self.user + "_touch_model")
     	load_models()
 
-    def train_apps(self):
-        return
-        #doesn't work yet
-        # all this might change, I might want to use the same code as the predictor up there
-        compressed = compress(user_taps_sf[user_taps_sf['app' == app]])
-        word_count = graphlab.text_analytics.count_words(compressed)
 
-
-        #corups_words = graphlab.SFrame([i
-        #compressed_sf = compress(user_taps_sf) #this should be and sf with only words and app
-        # somewhere, pass it to bag of words
-        #comppressed_sf['tfidf'] = graphlab
-
-
-    def predict_taps(self):
-        predictor = TapPredictor(self.user, "PREDICT TAPS")
+    def body_to_prediction_pipeline(self, mode="PREDICT TAPS"):
+        predictor = TapPredictor(self.user, mode)
         predictor_thread = predictor.start()
 
         names = self.rfile.readline().rstrip().split(",")
@@ -146,16 +133,17 @@ class RequestHandler(BaseHTTPRequestHandler):
         sys.stderr.write(self.path + "\n")
         if self.path == "/train_taps":
             self.train_taps()
-        elif self.path == "/train_apps":
-            self.train_apps()
         elif self.path == "/update_taps":
             self.update_taps()
-        elif self.path == "/update_apps":
-            self.update_apps()
         elif self.path == "/predict_taps":
-            self.predict_taps()
+            self.body_to_prediction_pipeline(mode="PREDICT TAPS")
+        elif self.path == "/train_apps":
+            pass
+            # TODO maybe self.finish_app_training()
+        elif self.path == "/update_apps":
+            self.body_to_prediction_pipeline(mode="UPDATE APPS")
         elif self.path == "/predict_apps":
-            self.predict_apps()
+            self.body_to_prediction_pipeline(mode="PREDICT APPS")
         else:
             self.send_response(404)
             self.end_headers()

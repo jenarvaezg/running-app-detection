@@ -29,6 +29,17 @@ class AppPredictor():
             this_app_sf = apps_sf[apps_sf['app'] == app]
             # do stuff here so we get bag of words and so on
 
+            #doesn't work yet
+            # all this might change, I might want to use the same code as the predictor up there
+            compressed = compress(user_taps_sf[user_taps_sf['app' == app]])
+            word_count = graphlab.text_analytics.count_words(compressed)
+
+
+            #corups_words = graphlab.SFrame([i
+            #compressed_sf = compress(user_taps_sf) #this should be and sf with only words and app
+            # somewhere, pass it to bag of words
+            #comppressed_sf['tfidf'] = graphlab
+
     def start(self):
         t = threading.Thread(target = self._loop)
         t.start()

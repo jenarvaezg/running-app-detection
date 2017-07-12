@@ -2,6 +2,8 @@ from Queue import Queue
 import threading
 import sys
 
+from time import time
+
 from collections import Counter
 
 from workers.app_predictor import AppPredictor
@@ -21,24 +23,25 @@ class Compressor():
 
     def get_most_commons(self, block):
         l = len(block)
-        if l > Compressor.MAX_BLOCK_SIZE:
-            left = self.get_most_commons(block[:l/2])
-            right = self.get_most_commons(block[l/2:])
-            return left + right
-        data = Counter(block)
-        return [data.most_common(1)[0][0]]
 
-    def pass_compressed(self, compressed):
+        if l > Compressor.MAX_BLOCK_SIZE:
+            left, ltime = self.get_most_commons(block[:l/2])
+            right, rtime = self.get_most_commons(block[l/2:])
+            return (left + right, ltime + rtime)
+        data = Counter(block)
+        return ([data.most_common(1)[0][0]], block[l/2]["timestamp"])
+
+    def pass_compressed(self, compressed, times):
         if self.mode == "PREDICT TAPS":
             sys("\n".join(compressed))
         elif self.mode == "UPDATE APPS":
             path = "data/" + self.user + "_apps.csv"
             if not os.path.isfile(path): #user doesn't have data
                 with open(path, "w") as f:
-                    f.write("word, app\n")
+                    f.write("word,timestamp,app\n")
             with open(path, "a") as f:
-                for word in compressed:
-                    f.write(word + "," + self.app + "\n")
+                for i in range(len(compressed)):
+                    f.write(compressed[i] + "," times[i], "," + self.app + "\n")
         elif self.mode == "PREDICT APPS":
             for word in compressed:
                 self.app_predictor.queue.put(word)
@@ -57,7 +60,7 @@ class Compressor():
                     self.app_predictor.queue.put("BYE")
                 return
             sys.stderr.write(sf["prediction"], n_noise, n_not_noise, in_noise_block, current_block, result, "\n")
-
+            sf['timestamp'] = time()
 
             if sf["prediction"][0] == "NOISE": # if we get noise
                 if in_noise_block: # and we are in a noise block
@@ -66,9 +69,9 @@ class Compressor():
                     continue # and keep reading
                 n_noise += 1 #otherwise we are in an event block, add to noise_counter
                 if n_noise >= Compressor.MAX_CONSECUTIVE_NOISE: # if we have enough consecutive noise
-                    compressed = self.get_most_commons(current_block) # get compressed
+                    compressed, times = self.get_most_commons(current_block) # get compressed
                     result.extend(compressed) # add to compressed result
-                    self.pass_compressed(compressed) # pass compressed
+                    self.pass_compressed(compressed, times) # pass compressed
                     in_noise_block = True # go back to being in a noise block
                     n_noise = n_not_noise = 0 # reset counters
                     current_block = [] # and reset current block
