@@ -4,3 +4,4 @@ server/data/*
 server/models/*
 server/*.log
 *.pyc
+*.swp
