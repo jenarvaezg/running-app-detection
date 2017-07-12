@@ -1,6 +1,8 @@
 from Queue import Queue
 import threading
+import sys
 
+from collections import Counter
 
 from workers.app_predictor import AppPredictor
 
@@ -14,7 +16,7 @@ class Compressor():
     def __init__(self, user, mode):
         self.user = user
         self.mode = mode
-        self.queue = Queue.Queue()
+        self.queue = Queue(0)
         self.lock = threading.Lock() # Maybe wont use
 
     def get_most_commons(self, block):
@@ -27,9 +29,9 @@ class Compressor():
         return [data.most_common(1)[0][0]]
 
     def pass_compressed(self, compressed):
-        if mode == "PREDICT TAPS":
-            print "\n".join(compressed)
-        elif mode == "UPDATE APPS":
+        if self.mode == "PREDICT TAPS":
+            sys("\n".join(compressed))
+        elif self.mode == "UPDATE APPS":
             path = "data/" + self.user + "_apps.csv"
             if not os.path.isfile(path): #user doesn't have data
                 with open(path, "w") as f:
@@ -37,9 +39,9 @@ class Compressor():
             with open(path, "a") as f:
                 for word in compressed:
                     f.write(word + "," + self.app + "\n")
-        elif mode == "PREDICT APPS":
+        elif self.mode == "PREDICT APPS":
             for word in compressed:
-                self.app_predictor.queue.put_nowait(word)
+                self.app_predictor.queue.put(word)
 
     def _loop(self):
         n_noise = 0
@@ -50,11 +52,13 @@ class Compressor():
         while(True):
             sf = self.queue.get(block=True)
             if type(sf) == str:
-                print "otro que se va"
+                sys.stderr.write("otro que se va")
                 if self.app_predictor:
-                    self.app_predictor.queue.put_nowait("BYE")
+                    self.app_predictor.queue.put("BYE")
                 return
-            print sf["prediction"], n_noise, n_not_noise, in_noise_block, current_block, result
+            sys.stderr.write(sf["prediction"], n_noise, n_not_noise, in_noise_block, current_block, result)
+
+
             if sf["prediction"][0] == "NOISE": # if we get noise
                 if in_noise_block: # and we are in a noise block
                     n_not_noise = 0 # reset not_noise counter

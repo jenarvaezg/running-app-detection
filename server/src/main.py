@@ -8,10 +8,9 @@ import os
 import tempfile
 import random
 import threading
-import collections
 import Queue
+import sys
 
-from collections import Counter
 from StringIO import StringIO
 import pandas as pd
 
@@ -69,14 +68,14 @@ class RequestHandler(BaseHTTPRequestHandler):
     def train_taps(self):
         path = "data/" + self.user + "_taps.csv"
         user_taps_sf = graphlab.SFrame.read_csv(path)
-        print user_taps_sf
-        print len(user_taps_sf), "TOTAL"
+        sys.stderr.write(str(user_taps_sf))
+        sys.stderr.write(str(len(user_taps_sf) + " TOTAL"))
         not_noise = user_taps_sf[user_taps_sf['noise'] == 0]
-        print len(not_noise), "NOT_NOISE"
+        sys.stderr.write(str(len(not_noise) + " NOT_NOISE"))
         swipes = not_noise[not_noise['type'] == "SWIPE"]
-        print len(swipes), "SWIPES"
+        sys.stderr.write(str(len(swipes) + " SWIPES"))
         touches = not_noise[not_noise['type'] == "TOUCH"]
-        print len(touches), "TOUCHES"
+        sys.stderr.write(str(len(touches)) + " TOUCHES")
         noise_model = graphlab.boosted_trees_classifier.create(user_taps_sf,
                                                             target="noise",
                                                             features=models_config.features,
@@ -144,7 +143,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             self.end_headers()
             return
 
-        print(self.path)
+        sys.stderr.write((self.path)
         if self.path == "/train_taps":
             self.train_taps()
         elif self.path == "/train_apps":
@@ -180,7 +179,7 @@ def load_models():
     try:
         all_models = os.listdir("models")
     except OSError as e:
-        print(str(e))
+        sys.stderr.write(str(e))
     else:
     	for model_path in all_models:
     		model = graphlab.load_model("models/" + model_path)
@@ -194,11 +193,11 @@ def load_models():
 
 
 def run():
-  print('starting server...')
+  sys.stderr.write(('starting server...')
 
   server_address = ('0.0.0.0', 8081)
   server = ThreadedHTTPServer(server_address, RequestHandler)
-  print('running server...')
+  sys.stderr.write('running server...')
   load_models()
 
   server.serve_forever()

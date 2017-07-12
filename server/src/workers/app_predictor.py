@@ -8,7 +8,7 @@ class AppPredictor():
 
     def __init__(self):
         self.user = user
-        self.queue = Queue.Queue()
+        self.queue = Queue(0)
         self.apps_sfs = self.load_apps_sfs()
 
 
@@ -17,7 +17,7 @@ class AppPredictor():
         while(True):
             word = self.queue.get(block=True)
             if word == "BYE":
-                print "And the last one leaves"
+                sys.stderr.write("And the last one leaves")
                 return
             # and magic happens here
 
