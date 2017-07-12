@@ -52,11 +52,11 @@ class Compressor():
         while(True):
             sf = self.queue.get(block=True)
             if type(sf) == str:
-                sys.stderr.write("otro que se va")
+                sys.stderr.write("otro que se va\n")
                 if self.app_predictor:
                     self.app_predictor.queue.put("BYE")
                 return
-            sys.stderr.write(sf["prediction"], n_noise, n_not_noise, in_noise_block, current_block, result)
+            sys.stderr.write(sf["prediction"], n_noise, n_not_noise, in_noise_block, current_block, result, "\n")
 
 
             if sf["prediction"][0] == "NOISE": # if we get noise

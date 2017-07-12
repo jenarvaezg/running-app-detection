@@ -29,7 +29,7 @@ class TapPredictor():
         while(True):
             sf = self.queue.get(block=True)
             if type(sf) == str:
-                sys.stderr.write("si ya saben como me pongo pa que me invitan")
+                sys.stderr.write("si ya saben como me pongo pa que me invitan\n")
                 self.compressor.queue.put_nowait(sf) # sf is actually a string
                 return
             if self.noise_model.predict(sf)[0]: #noise
@@ -42,7 +42,7 @@ class TapPredictor():
                     sf["prediction"] = self.touch_model.predict(sf)[0]
             self.compressor.queue.put_nowait(sf)
 
-        sys.stderr.write("nigga bye")
+        sys.stderr.write("nigga bye\n")
 
     def start(self):
          t = threading.Thread(target=self._loop)

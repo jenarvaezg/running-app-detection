@@ -68,14 +68,14 @@ class RequestHandler(BaseHTTPRequestHandler):
     def train_taps(self):
         path = "data/" + self.user + "_taps.csv"
         user_taps_sf = graphlab.SFrame.read_csv(path)
-        sys.stderr.write(str(user_taps_sf))
-        sys.stderr.write(str(len(user_taps_sf) + " TOTAL"))
+        sys.stderr.write(str(user_taps_sf) + "\n")
+        sys.stderr.write(str(len(user_taps_sf)) + " TOTAL\n")
         not_noise = user_taps_sf[user_taps_sf['noise'] == 0]
-        sys.stderr.write(str(len(not_noise) + " NOT_NOISE"))
+        sys.stderr.write(str(len(not_noise)) + " NOT_NOISE\n")
         swipes = not_noise[not_noise['type'] == "SWIPE"]
-        sys.stderr.write(str(len(swipes) + " SWIPES"))
+        sys.stderr.write(str(len(swipes)) + " SWIPES\n")
         touches = not_noise[not_noise['type'] == "TOUCH"]
-        sys.stderr.write(str(len(touches)) + " TOUCHES")
+        sys.stderr.write(str(len(touches)) + " TOUCHES\n")
         noise_model = graphlab.boosted_trees_classifier.create(user_taps_sf,
                                                             target="noise",
                                                             features=models_config.features,
@@ -143,7 +143,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             self.end_headers()
             return
 
-        sys.stderr.write((self.path)
+        sys.stderr.write(self.path + "\n")
         if self.path == "/train_taps":
             self.train_taps()
         elif self.path == "/train_apps":
@@ -179,7 +179,7 @@ def load_models():
     try:
         all_models = os.listdir("models")
     except OSError as e:
-        sys.stderr.write(str(e))
+        sys.stderr.write(str(e) + "\n")
     else:
     	for model_path in all_models:
     		model = graphlab.load_model("models/" + model_path)
@@ -193,11 +193,11 @@ def load_models():
 
 
 def run():
-  sys.stderr.write(('starting server...')
+  sys.stderr.write('starting server...\n')
 
   server_address = ('0.0.0.0', 8081)
   server = ThreadedHTTPServer(server_address, RequestHandler)
-  sys.stderr.write('running server...')
+  sys.stderr.write('running server...\n"')
   load_models()
 
   server.serve_forever()

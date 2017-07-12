@@ -17,7 +17,7 @@ class AppPredictor():
         while(True):
             word = self.queue.get(block=True)
             if word == "BYE":
-                sys.stderr.write("And the last one leaves")
+                sys.stderr.write("And the last one leaves\n")
                 return
             # and magic happens here
 
