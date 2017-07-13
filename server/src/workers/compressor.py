@@ -1,6 +1,7 @@
 from Queue import Queue
 import threading
-import sys
+import random
+import os
 
 from time import time
 
@@ -13,9 +14,10 @@ class Compressor():
 
     MAX_CONSECUTIVE_NOISE = 10
     MAX_CONSECUTIVE_NOT_NOISE = 10
-    MAX_BLOCK_SIZE = 30
+    MAX_BLOCK_SIZE = 40
 
     def __init__(self, user, mode):
+        self.session_id = ''.join(random.choice('0123456789ABCDEF') for i in range(16))
         self.user = user
         self.mode = mode
         self.queue = Queue(0)
@@ -23,26 +25,28 @@ class Compressor():
 
     def get_most_commons(self, block):
         l = len(block)
-
         if l > Compressor.MAX_BLOCK_SIZE:
             left, ltime = self.get_most_commons(block[:l/2])
             right, rtime = self.get_most_commons(block[l/2:])
             return (left + right, ltime + rtime)
-        data = Counter(block)
-        return ([data.most_common(1)[0][0]], block[l/2]["timestamp"])
+
+        words = [e['word'] for e in block]
+        data = Counter(words)
+        return ([data.most_common(1)[0][0]], [block[l/2]["time"]])
 
     def pass_compressed(self, compressed, times):
-        if self.mode == "PREDICT TAPS":
-            sys("\n".join(compressed))
-        elif self.mode == "UPDATE APPS":
+        print("HEY I GOT", compressed, times)
+        if self.mode == "PREDICT_TAPS":
+            print "\n".join(compressed)
+        elif self.mode == "UPDATE_APPS":
             path = "data/" + self.user + "_apps.csv"
             if not os.path.isfile(path): #user doesn't have data
                 with open(path, "w") as f:
-                    f.write("word,timestamp,app\n")
+                    f.write("word,timestamp,app,session_id\n")
             with open(path, "a") as f:
                 for i in range(len(compressed)):
-                    f.write(compressed[i] + "," times[i], "," + self.app + "\n")
-        elif self.mode == "PREDICT APPS":
+                    f.write(compressed[i] + "," + str(times[i]) + "," + self.app + "," + self.session_id + "\n")
+        elif self.mode == "PREDICT_APPS":
             for word in compressed:
                 self.app_predictor.queue.put(word)
 
@@ -53,14 +57,15 @@ class Compressor():
         current_block = []
         result = []
         while(True):
+            print("Compressor:", self.queue.qsize())
             sf = self.queue.get(block=True)
             if type(sf) == str:
-                sys.stderr.write("otro que se va\n")
-                if self.app_predictor:
+                print "otro que se va"
+                if self.mode == "PREDICT_APPS":
                     self.app_predictor.queue.put("BYE")
+                    self.app_predictor_t.join()
                 return
-            sys.stderr.write(sf["prediction"], n_noise, n_not_noise, in_noise_block, current_block, result, "\n")
-            sf['timestamp'] = time()
+            #print(sf["prediction"], n_noise, n_not_noise, in_noise_block, current_block, result)
 
             if sf["prediction"][0] == "NOISE": # if we get noise
                 if in_noise_block: # and we are in a noise block
@@ -76,7 +81,7 @@ class Compressor():
                     n_noise = n_not_noise = 0 # reset counters
                     current_block = [] # and reset current block
             else: # if we get something that is not noise
-                current_block.append(sf["prediction"][0]) # add to posibly current block
+                current_block.append({'word': sf["prediction"][0], 'time': time()}) # add to posibly current block
                 if in_noise_block: # if we are in a block of noise
                     n_not_noise += 1 # add to not_noise_counter
                     if n_not_noise >= Compressor.MAX_CONSECUTIVE_NOT_NOISE: # if we have enough consecutive not noise
@@ -88,7 +93,7 @@ class Compressor():
     def start(self):
         t = threading.Thread(target = self._loop)
         t.start()
-        if mode == "PREDICT_APPS":
+        if self.mode == "PREDICT_APPS":
             self.app_predictor = AppPredictor(self.user)
             self.app_predictor_t = self.app_predictor.start()
         return t

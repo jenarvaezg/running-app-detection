@@ -30,7 +30,8 @@ class RequestHandler(BaseHTTPRequestHandler):
     apps_file_mutex = threading.Lock()
 
     def get_msg(self, compressed=False):
-        blob = self.rfile.read(int(self.headers['Content-Length']))
+        size = int(self.headers.get('Content-Length', 0))
+        blob = self.rfile.read(size)
 	if not compressed:
 		return blob
         message = zlib.decompress(gz_blob, 16+zlib.MAX_WBITS)
@@ -51,19 +52,6 @@ class RequestHandler(BaseHTTPRequestHandler):
         path = "data/" + self.user + "_taps.csv"
         self.save_msg_to_file(path)
 
-    def update_apps(self):
-        predictor = TapPredictor(self.user, "UPDATE APPS", models[self.user])
-        predictor_thread = predictor.start()
-
-        names = self.rfile.readline().rstrip().split(",")
-        for line in self.rfile:
-            splitted = [[float(x)] for x in line.rstrip().split(",")] # god damnit graphlab
-            d = dict(zip(names, splitted))
-            sf = graphlab.SFrame(d)
-            predictor.queue.put_nowait(sf)
-            predictor.queue.put_nowait("BYE")
-            predictor_thread.join()
-        return
 
     def train_taps(self):
         path = "data/" + self.user + "_taps.csv"
@@ -104,16 +92,23 @@ class RequestHandler(BaseHTTPRequestHandler):
     	load_models()
 
 
-    def body_to_prediction_pipeline(self, mode="PREDICT TAPS"):
-        predictor = TapPredictor(self.user, mode)
+    def body_to_prediction_pipeline(self, mode="PREDICT_TAPS"):
+        print "MODE IS: ", mode
+        predictor = TapPredictor(self.user, mode, models[self.user])
         predictor_thread = predictor.start()
 
         names = self.rfile.readline().rstrip().split(",")
+
         for line in self.rfile:
-            splitted = [[float(x)] for x in line.rstrip().split(",")] # god damnit graphlab
+            splitted = [[x] if x.isalpha() else [float(x)] for x in line.rstrip().split(",")] # god damnit graphlab
             d = dict(zip(names, splitted))
+            if mode == "UPDATE_APPS" and predictor.app == "":
+                predictor.set_app(d['app'][0])
             sf = graphlab.SFrame(d)
-            predictor.queue.put_nowait(sf)
+            predictor.queue.put(sf)
+        print("*********************")
+        print("Server WAITING")
+        print("*********")
         predictor.queue.put_nowait("BYE")
         predictor_thread.join()
         return
@@ -136,14 +131,14 @@ class RequestHandler(BaseHTTPRequestHandler):
         elif self.path == "/update_taps":
             self.update_taps()
         elif self.path == "/predict_taps":
-            self.body_to_prediction_pipeline(mode="PREDICT TAPS")
+            self.body_to_prediction_pipeline(mode="PREDICT_TAPS")
         elif self.path == "/train_apps":
             pass
             # TODO maybe self.finish_app_training()
         elif self.path == "/update_apps":
-            self.body_to_prediction_pipeline(mode="UPDATE APPS")
+            self.body_to_prediction_pipeline(mode="UPDATE_APPS")
         elif self.path == "/predict_apps":
-            self.body_to_prediction_pipeline(mode="PREDICT APPS")
+            self.body_to_prediction_pipeline(mode="PREDICT_APPS")
         else:
             self.send_response(404)
             self.end_headers()

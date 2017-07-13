@@ -10,6 +10,7 @@ class AppPredictor():
         self.user = user
         self.queue = Queue(0)
         self.apps_sfs = self.load_apps_sfs()
+        
 
 
     def _loop(self):
