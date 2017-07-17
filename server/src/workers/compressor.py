@@ -56,14 +56,15 @@ class Compressor():
         in_noise_block = True
         current_block = []
         result = []
+
         while(True):
-            print("Compressor:", self.queue.qsize())
             sf = self.queue.get(block=True)
             if type(sf) == str:
-                print "otro que se va"
                 if self.mode == "PREDICT_APPS":
                     self.app_predictor.queue.put("BYE")
+                    print("Compressor waiting for app predictor")
                     self.app_predictor_t.join()
+                print "Compressor leaving"
                 return
             #print(sf["prediction"], n_noise, n_not_noise, in_noise_block, current_block, result)
 
@@ -92,6 +93,7 @@ class Compressor():
 
     def start(self):
         t = threading.Thread(target = self._loop)
+        t.daemon = True
         t.start()
         if self.mode == "PREDICT_APPS":
             self.app_predictor = AppPredictor(self.user)

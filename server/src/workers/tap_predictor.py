@@ -37,21 +37,23 @@ class TapPredictor():
         self.mode = mode
         self.lock = threading.Lock()
         self.models = models
+        self.workers = []
+        self.NWORKERS = 3
+        self.init_user(user)
         # self.compressor_thread = compressor_thread
-
 
     def set_app(self, app):
         self.app = app
         self.compressor.app = app
 
-    def _loop(self):
+    def _worker_loop(self, id):
         while(True):
             sf = self.queue.get(block=True)
             if type(sf) == str:
-                sys.stderr.write("si ya saben como me pongo pa que me invitan\n")
+                print("Tap Worker {} leaving".format(id))
                 self.compressor.queue.put_nowait(sf) # sf is actually a string
-                self.compressor_thread.join()
                 return
+
             if self.noise_model.predict(sf)[0]: #noise
                 sf["prediction"] = "NOISE"
             else:
@@ -60,13 +62,27 @@ class TapPredictor():
                     sf["prediction"] = self.swipe_model.predict(sf)[0]
                 else:
                     sf["prediction"] = self.touch_model.predict(sf)[0]
+
             self.compressor.queue.put_nowait(sf)
 
-        sys.stderr.write("nigga bye\n")
+
+    def stop(self):
+        for worker in self.workers:
+            self.queue.put("BYE")
+            worker.join()
+            print("Joined with tap worker")
+        self.compressor_thread.join()
+        print("Joined with compressor thread, tap predictor leaving")
+        return
+
+
 
     def start(self):
-         t = threading.Thread(target=self._loop)
-         t.start()
-         self.compressor = Compressor(self.user, self.mode)
-         self.compressor_thread = self.compressor.start()
-         return t
+        for i in range(self.NWORKERS):
+            t = threading.Thread(target=self._worker_loop, args=(i, ))
+            t.daemon = True
+            self.workers.append(t)
+            t.start()
+        self.compressor = Compressor(self.user, self.mode)
+        self.compressor_thread = self.compressor.start()
+        return self

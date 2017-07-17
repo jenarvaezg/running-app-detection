@@ -10,7 +10,7 @@ class AppPredictor():
         self.user = user
         self.queue = Queue(0)
         self.apps_sfs = self.load_apps_sfs()
-        
+
 
 
     def _loop(self):
@@ -43,5 +43,6 @@ class AppPredictor():
 
     def start(self):
         t = threading.Thread(target = self._loop)
+        t.daemon = True
         t.start()
         return t

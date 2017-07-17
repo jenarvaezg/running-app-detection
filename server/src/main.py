@@ -17,6 +17,7 @@ import pandas as pd
 import config.models_config as models_config
 
 from workers.tap_predictor import TapPredictor
+from workers.monitor import Monitor
 
 
 models = {}
@@ -93,10 +94,11 @@ class RequestHandler(BaseHTTPRequestHandler):
 
 
     def body_to_prediction_pipeline(self, mode="PREDICT_TAPS"):
-        print "MODE IS: ", mode
         predictor = TapPredictor(self.user, mode, models[self.user])
-        predictor_thread = predictor.start()
+        predictor.start()
 
+        monitor = Monitor(predictor)
+        monitor.start()
         names = self.rfile.readline().rstrip().split(",")
 
         for line in self.rfile:
@@ -109,8 +111,9 @@ class RequestHandler(BaseHTTPRequestHandler):
         print("*********************")
         print("Server WAITING")
         print("*********")
-        predictor.queue.put_nowait("BYE")
-        predictor_thread.join()
+        predictor.stop()
+        monitor.stop()
+        print("Joined with predictor")
         return
 
     def do_POST(self):
