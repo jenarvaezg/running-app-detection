@@ -52,7 +52,7 @@ public class MainActivity extends AppCompatActivity {
 
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 if (!isChecked) {
-                    started = false;
+                    MainActivity.started = false;
                     Intent intent = new Intent(MainActivity.this, SensorGatherService.class);
                     intent.setAction(SensorGatherService.ACTION_STOP);
                     startService(intent);
@@ -63,10 +63,6 @@ public class MainActivity extends AppCompatActivity {
                         Log.d(TAG, "Already started");
                         return;
                     }
-                    started = true;
-                    Intent intent = new Intent(MainActivity.this, SensorGatherService.class);
-                    intent.setAction(SensorGatherService.ACTION_START);
-                    startService(intent);
 
                     setupDialogs();
 
@@ -86,41 +82,52 @@ public class MainActivity extends AppCompatActivity {
         appsOrTapsBuilder.setMessage(R.string.dialog_apps_taps);
         appsOrTapsBuilder.setPositiveButton(R.string.apps, new DialogInterface.OnClickListener() {
 
-            final private void callService(String app) {
+            final private void callService(String app, String action) {
+
+                MainActivity.started = true;
                 Intent intent = new Intent(MainActivity.this, SensorGatherService.class);
-                intent.setAction(SensorGatherService.ACTION_TRAIN);
+                intent.setAction(SensorGatherService.ACTION_START);
+                startService(intent);
+
+                intent = new Intent(MainActivity.this, SensorGatherService.class);
+                intent.setAction(action);
                 intent.putExtra("APP", app);
                 intent.setType("APPS");
                 startService(intent);
+
+                Log.d(TAG, "THIS SHOULD NOT APPEAR");
+
             }
 
-            private void setupAppsDialog(){
+            private void setupAppsDialog(String action) {
 
                 appsDialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
                 appsDialog.setContentView(R.layout.apps_layout);
-                appsDialog.setCanceledOnTouchOutside(false);
                 appsDialog.setCancelable(false);
+                appsDialog.setCanceledOnTouchOutside(false);
 
                 Spinner appsSpinner = (Spinner) appsDialog.findViewById(R.id.apps_spinner);
 
-                final String[] apps = new String[] {
+                final String[] apps = new String[]{
                         "app to launch", "facebook", "whatsapp"
                 };
                 ArrayAdapter<String> adapter = new ArrayAdapter<>(MainActivity.this, android.R.layout.simple_spinner_item, apps);
                 appsSpinner.setAdapter(adapter);
 
+                final String action_f = action;
                 appsSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 
                     Boolean first = true;
+
                     @Override
                     public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                         Log.d(TAG, "FIRST? " + Boolean.toString(first) + " position: " + Integer.toString(position));
-                        if (first){
+                        if (first) {
                             first = false;
                             return;
                         }
-                        Log.d(TAG, Integer.toString(position) +  " " + apps[position]);
-                        callService(apps[position]);
+                        Log.d(TAG, Integer.toString(position) + " " + apps[position]);
+                        callService(apps[position], action_f);
                         appsDialog.dismiss();
                     }
 
@@ -137,13 +144,10 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onClick(DialogInterface dialog, int which) {
-                if(MainActivity.training){
-                    setupAppsDialog();
-                }else {
-                    Intent intent = new Intent(MainActivity.this, SensorGatherService.class);
-                    intent.setAction(SensorGatherService.ACTION_PREDICT);
-                    intent.setType("APPS");
-                    startService(intent);
+                if (MainActivity.training) {
+                    setupAppsDialog(SensorGatherService.ACTION_TRAIN);
+                } else {
+                    setupAppsDialog(SensorGatherService.ACTION_PREDICT);
                 }
                 drawView.setVisibility(View.VISIBLE);
             }
@@ -170,6 +174,7 @@ public class MainActivity extends AppCompatActivity {
         builderTrainPredict.setPositiveButton(R.string.dialog_predict, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
+                MainActivity.training = false;
                 appsOrTapsDialog.show();
             }
         });
@@ -190,6 +195,10 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        if(MainActivity.started) {
+            startStopSwitch.setChecked(false);
+        }
+        Log.d(TAG, "RESUMING! " + Boolean.toString(started));
 
     }
 

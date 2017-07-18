@@ -13,6 +13,7 @@ public class EventWindowFeatures{
 
     private static final Integer WINDOW_SIZE = 20;
     private static final String TAG ="EVENTWINDOWFEATURES";
+    private static Integer seq_n = 0;
 
     private Integer n_accel = 0;
     private Integer n_gyro = 0;
@@ -26,6 +27,7 @@ public class EventWindowFeatures{
     private String when, action, type;
     private Integer noise = 0;
     private String app;
+
 
     EventWindowFeatures(SensorEventData[] events, Boolean isLabeled, String app){
         this.app = app;
@@ -138,7 +140,7 @@ public class EventWindowFeatures{
                 "gyro_y_mean,gyro_y_median,gyro_y_var,"+
                 "gyro_y_skewness,gyro_y_kurtosis,gyro_y_diff,"+
                 "gyro_z_mean,gyro_z_median,gyro_z_var,"+
-                "gyro_z_skewness,gyro_z_kurtosis,gyro_z_diff\n";
+                "gyro_z_skewness,gyro_z_kurtosis,gyro_z_diff,seq_n\n";
     }
 
     public static String getTrainingTapsCSVHeader() {
@@ -163,6 +165,7 @@ public class EventWindowFeatures{
                     append(vars[i]).append(",").append(skewnesses[i]).append(",")
                     .append(kurtoses[i]).append(",").append(diffs[i]);
         }
+        sb.append(",").append(++seq_n);
         if(isLabeled){
             sb.append(",").append(when).append(",").append(noise).append(",").
                     append(type).append(",").append(action);

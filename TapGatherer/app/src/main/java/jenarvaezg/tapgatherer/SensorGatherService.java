@@ -9,6 +9,7 @@ import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.util.AndroidRuntimeException;
 import android.util.Log;
 import java.util.Arrays;
 import java.util.Collection;
@@ -132,7 +133,9 @@ public class SensorGatherService extends IntentService implements SensorEventLis
 
 
     private void stopSensors(){
-        mSensorManager.unregisterListener(listener);
+        try {
+            mSensorManager.unregisterListener(listener);
+        }catch (NullPointerException e){}
         stopped = true;
     }
 
@@ -245,7 +248,8 @@ public class SensorGatherService extends IntentService implements SensorEventLis
     }
 
     private void sendTrainAppsCommand(){
-        NetworkWorker.sendString(NetworkWorker.Urls.TRAIN_APPS, "", true);
+        return;
+        // unnecesary NetworkWorker.sendString(NetworkWorker.Urls.TRAIN_APPS, "", true);
     }
 
 }
