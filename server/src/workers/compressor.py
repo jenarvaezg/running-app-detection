@@ -12,9 +12,9 @@ from workers.app_predictor import AppPredictor
 
 class Compressor():
 
-    MAX_CONSECUTIVE_NOISE = 10
-    MAX_CONSECUTIVE_NOT_NOISE = 10
-    MAX_BLOCK_SIZE = 40
+    MAX_CONSECUTIVE_NOISE = 15
+    MAX_CONSECUTIVE_NOT_NOISE = 40
+    MAX_BLOCK_SIZE = 100
 
     def __init__(self, user, mode):
         self.session_id = ''.join(random.choice('0123456789ABCDEF') for i in range(16))
@@ -56,16 +56,17 @@ class Compressor():
         in_noise_block = True
         current_block = []
         result = []
+
         while(True):
-            print("Compressor:", self.queue.qsize())
             sf = self.queue.get(block=True)
             if type(sf) == str:
-                print "otro que se va"
                 if self.mode == "PREDICT_APPS":
                     self.app_predictor.queue.put("BYE")
+                    print("Compressor waiting for app predictor")
                     self.app_predictor_t.join()
+                print "Compressor leaving"
                 return
-            #print(sf["prediction"], n_noise, n_not_noise, in_noise_block, current_block, result)
+            # print(sf["prediction"], n_noise, n_not_noise, in_noise_block, current_block, result)
 
             if sf["prediction"][0] == "NOISE": # if we get noise
                 if in_noise_block: # and we are in a noise block
@@ -76,6 +77,7 @@ class Compressor():
                 if n_noise >= Compressor.MAX_CONSECUTIVE_NOISE: # if we have enough consecutive noise
                     compressed, times = self.get_most_commons(current_block) # get compressed
                     result.extend(compressed) # add to compressed result
+                    print "HAD ", current_block, len(current_block)
                     self.pass_compressed(compressed, times) # pass compressed
                     in_noise_block = True # go back to being in a noise block
                     n_noise = n_not_noise = 0 # reset counters
@@ -92,6 +94,7 @@ class Compressor():
 
     def start(self):
         t = threading.Thread(target = self._loop)
+        t.daemon = True
         t.start()
         if self.mode == "PREDICT_APPS":
             self.app_predictor = AppPredictor(self.user)
