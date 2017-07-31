@@ -16,10 +16,16 @@ class Monitor():
 
     def _loop(self):
         print("MONITORING!")
+        change = True
+        workers_before, compressor_before = (-1, -1)
         while self.loop:
-            print("Workers: {}, compressor: {}".format(
-                self.tap_predictor_queue.qsize(),
-                self.compressor_queue.qsize()))
+            workers = self.tap_predictor_queue.qsize()
+            compressor = self.compressor_queue.qsize()
+            print("Workers: {}, compressor: {}".format(workers, compressor))
+
+            if workers_before == workers and compressor_before == compressor:
+                break
+            workers_before, compressor_before = workers, compressor
             time.sleep(2)
 
         self.loop = True

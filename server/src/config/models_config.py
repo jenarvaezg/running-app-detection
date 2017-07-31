@@ -47,7 +47,7 @@ features = [
 
 ]
 
-noise_max_iterations = 200 #640
+noise_max_iterations = 640
 noise_max_depth = 4
 
 type_max_iterations = 100 #160
@@ -56,5 +56,5 @@ type_max_depth = 6
 swipe_max_iterations = 40
 swipe_max_depth = 6
 
-touch_max_iterations = 200 #640
+touch_max_iterations = 300 #640
 touch_max_depth = 2

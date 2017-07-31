@@ -12,9 +12,9 @@ from workers.app_predictor import AppPredictor
 
 class Compressor():
 
-    MAX_CONSECUTIVE_NOISE = 15
-    MAX_CONSECUTIVE_NOT_NOISE = 40
-    MAX_BLOCK_SIZE = 100
+    MAX_CONSECUTIVE_NOISE = 10
+    MAX_CONSECUTIVE_NOT_NOISE = 30
+    MAX_BLOCK_SIZE = 80
 
     def __init__(self, user, mode):
         self.session_id = ''.join(random.choice('0123456789ABCDEF') for i in range(16))

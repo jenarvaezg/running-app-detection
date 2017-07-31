@@ -38,7 +38,7 @@ class TapPredictor():
         self.lock = threading.Lock()
         self.models = models
         self.workers = []
-        self.NWORKERS = 3
+        self.NWORKERS = 2
         self.init_user(user)
         self.app = ""
         # self.compressor_thread = compressor_thread

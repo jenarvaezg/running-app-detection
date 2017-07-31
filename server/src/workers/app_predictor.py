@@ -6,7 +6,7 @@ import graphlab
 
 class AppPredictor():
 
-    def __init__(self):
+    def __init__(self, user):
         self.user = user
         self.queue = Queue(0)
         self.apps_sfs = self.load_apps_sfs()
