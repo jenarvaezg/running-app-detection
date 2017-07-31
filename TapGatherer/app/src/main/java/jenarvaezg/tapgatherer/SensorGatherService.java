@@ -43,7 +43,7 @@ public class SensorGatherService extends IntentService implements SensorEventLis
 
     private static EventStack eventStack;
 
-    static Map<Integer, TimeBase> sensorOffsets = new HashMap<>();
+    static Map<Integer, TimeBase> sensorOffsets;
 
     class TimeBase{
         Long dateBase;
@@ -112,6 +112,9 @@ public class SensorGatherService extends IntentService implements SensorEventLis
         }else if(app.equals("facebook")){
             String uri = "facebook://facebook.com/inbox";
             intent = new Intent(Intent.ACTION_VIEW, Uri.parse(uri));
+        }else if(app.equals("tinder")){
+            String uri="tinder://";
+            intent = new Intent(Intent.ACTION_VIEW, Uri.parse(uri));
         }
 
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -129,6 +132,8 @@ public class SensorGatherService extends IntentService implements SensorEventLis
         mSensorManager.registerListener(this, mAccelerometer, delay);
         mSensorManager.registerListener(this, mGyroscope, delay);
         listener = this;
+
+        sensorOffsets = new HashMap<>();
     }
 
 

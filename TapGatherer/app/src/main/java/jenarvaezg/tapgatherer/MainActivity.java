@@ -109,7 +109,7 @@ public class MainActivity extends AppCompatActivity {
                 Spinner appsSpinner = (Spinner) appsDialog.findViewById(R.id.apps_spinner);
 
                 final String[] apps = new String[]{
-                        "app to launch", "facebook", "whatsapp"
+                        "app to launch", "facebook", "whatsapp", "tinder",
                 };
                 ArrayAdapter<String> adapter = new ArrayAdapter<>(MainActivity.this, android.R.layout.simple_spinner_item, apps);
                 appsSpinner.setAdapter(adapter);
