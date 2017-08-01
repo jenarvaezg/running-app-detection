@@ -83,7 +83,7 @@ class Compressor():
                     n_noise = n_not_noise = 0 # reset counters
                     current_block = [] # and reset current block
             else: # if we get something that is not noise
-                current_block.append({'word': sf["prediction"][0], 'time': time()}) # add to posibly current block
+                current_block.append({'word': sf["prediction"][0], 'time': sf["timestamp"][0]}) # add to posibly current block
                 if in_noise_block: # if we are in a block of noise
                     n_not_noise += 1 # add to not_noise_counter
                     if n_not_noise >= Compressor.MAX_CONSECUTIVE_NOT_NOISE: # if we have enough consecutive not noise

@@ -27,6 +27,7 @@ public class EventWindowFeatures{
     private String when, action, type;
     private Integer noise = 0;
     private String app;
+    private Long timestamp = 0l;
 
 
     EventWindowFeatures(SensorEventData[] events, Boolean isLabeled, String app){
@@ -34,7 +35,9 @@ public class EventWindowFeatures{
         this.isLabeled = isLabeled;
         final ArrayList<SensorEventData> gyroEvents = new ArrayList<>();
         final ArrayList<SensorEventData> accelEvents = new ArrayList<>();
+
         for(SensorEventData event : events){
+            this.timestamp += event.timestamp / WINDOW_SIZE;
             if(event.sensorName.equals("Accelerometer")){
                 accelEvents.add(event);
                 n_accel++;
@@ -140,7 +143,7 @@ public class EventWindowFeatures{
                 "gyro_y_mean,gyro_y_median,gyro_y_var,"+
                 "gyro_y_skewness,gyro_y_kurtosis,gyro_y_diff,"+
                 "gyro_z_mean,gyro_z_median,gyro_z_var,"+
-                "gyro_z_skewness,gyro_z_kurtosis,gyro_z_diff,seq_n\n";
+                "gyro_z_skewness,gyro_z_kurtosis,gyro_z_diff,seq_n,timestamp\n";
     }
 
     public static String getTrainingTapsCSVHeader() {
@@ -165,7 +168,7 @@ public class EventWindowFeatures{
                     append(vars[i]).append(",").append(skewnesses[i]).append(",")
                     .append(kurtoses[i]).append(",").append(diffs[i]);
         }
-        sb.append(",").append(++seq_n);
+        sb.append(",").append(++seq_n).append(",").append(timestamp);
         if(isLabeled){
             sb.append(",").append(when).append(",").append(noise).append(",").
                     append(type).append(",").append(action);
