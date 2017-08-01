@@ -57,7 +57,6 @@ class RequestHandler(BaseHTTPRequestHandler):
     def train_taps(self):
         path = "data/" + self.user + "_taps.csv"
         user_taps_sf = graphlab.SFrame.read_csv(path)
-        sys.stderr.write(str(user_taps_sf) + "\n")
         sys.stderr.write(str(len(user_taps_sf)) + " TOTAL\n")
         not_noise = user_taps_sf[user_taps_sf['noise'] == 0]
         sys.stderr.write(str(len(not_noise)) + " NOT_NOISE\n")

@@ -15,6 +15,7 @@ class Compressor():
     MAX_CONSECUTIVE_NOISE = 10
     MAX_CONSECUTIVE_NOT_NOISE = 30
     MAX_BLOCK_SIZE = 80
+    SIDE_TRIM_SIZE = 5
 
     def __init__(self, user, mode):
         self.session_id = ''.join(random.choice('0123456789ABCDEF') for i in range(16))
@@ -24,7 +25,9 @@ class Compressor():
         self.lock = threading.Lock() # Maybe wont use
 
     def get_most_commons(self, block):
+        block = block[self.SIDE_TRIM_SIZE:-self.SIDE_TRIM_SIZE]
         l = len(block)
+
         if l > Compressor.MAX_BLOCK_SIZE:
             left, ltime = self.get_most_commons(block[:l/2])
             right, rtime = self.get_most_commons(block[l/2:])
@@ -83,7 +86,7 @@ class Compressor():
                     n_noise = n_not_noise = 0 # reset counters
                     current_block = [] # and reset current block
             else: # if we get something that is not noise
-                current_block.append({'word': sf["prediction"][0], 'time': sf["timestamp"][0]}) # add to posibly current block
+                current_block.append({'word': sf["prediction"][0], 'time': int(sf["timestamp"][0])}) # add to posibly current block
                 if in_noise_block: # if we are in a block of noise
                     n_not_noise += 1 # add to not_noise_counter
                     if n_not_noise >= Compressor.MAX_CONSECUTIVE_NOT_NOISE: # if we have enough consecutive not noise

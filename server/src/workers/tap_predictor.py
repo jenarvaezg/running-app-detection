@@ -17,6 +17,8 @@ class TapPredictor():
         self.workers = []
         self.NWORKERS = 2
         self.app = ""
+        self.noise_prediction_threshold = 0.3
+
 
     def set_app(self, app):
         self.app = app
@@ -30,7 +32,8 @@ class TapPredictor():
                 self.compressor.queue.put_nowait(sf) # sf is actually a string
                 return
 
-            if self.noise_model.predict(sf)[0]: #noise
+            prob = self.noise_model.predict(sf, output_type="probability")[0]
+            if prob > self.noise_prediction_threshold: #noise
                 sf["prediction"] = "NOISE"
             else:
                 e_type = self.type_model.predict(sf)[0]
@@ -50,7 +53,7 @@ class TapPredictor():
         self.compressor_thread.join()
         print("Joined with compressor thread, tap predictor leaving")
         return
-        
+
 
     def start(self):
         for i in range(self.NWORKERS):

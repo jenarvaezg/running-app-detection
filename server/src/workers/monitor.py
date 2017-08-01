@@ -5,6 +5,7 @@ from Queue import Queue
 class Monitor():
 
     loop = True
+    LEAVE_THRESHOLD = 4
 
     def __init__(self, tap_predictor):
 
@@ -16,7 +17,8 @@ class Monitor():
 
     def _loop(self):
         print("MONITORING!")
-        change = True
+        n_same = 0
+
         workers_before, compressor_before = (-1, -1)
         while self.loop:
             workers = self.tap_predictor_queue.qsize()
@@ -24,6 +26,11 @@ class Monitor():
             print("Workers: {}, compressor: {}".format(workers, compressor))
 
             if workers_before == workers and compressor_before == compressor:
+                n_same += 1
+            else:
+                n_same = 0
+
+            if n_same > Monitor.LEAVE_THRESHOLD:
                 break
             workers_before, compressor_before = workers, compressor
             time.sleep(2)
