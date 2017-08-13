@@ -63,11 +63,7 @@ class Compressor():
         while(True):
             sf = self.queue.get(block=True)
             if type(sf) == str:
-                if self.mode == "PREDICT_APPS":
-                    self.app_predictor.queue.put("BYE")
-                    print("Compressor waiting for app predictor")
-                    self.app_predictor_t.join()
-                print "Compressor leaving"
+                self._exit_operations()
                 return
             # print(sf["prediction"], n_noise, n_not_noise, in_noise_block, current_block, result)
 
@@ -94,6 +90,18 @@ class Compressor():
                         n_noise = n_not_noise = 0 # reset counter
                 else: # if we are not in a noise block
                     n_noise = 0 #reset noise counter
+
+    def _exit_operations(self):
+        if self.mode == "PREDICT_APPS":
+            self.app_predictor.queue.put("BYE")
+            print("Compressor waiting for app predictor")
+            self.app_predictor_t.join()
+        elif self.mode == "TRAIN_APPS":
+            print "Generating app model for user", self.user
+            AppPredictor.generate_app_model(self.user)
+            print "Model saved"
+
+        print "Compressor leaving"
 
     def start(self):
         t = threading.Thread(target = self._loop)
