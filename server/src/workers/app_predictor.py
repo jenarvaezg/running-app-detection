@@ -2,6 +2,7 @@ from Queue import Queue
 import threading
 
 import graphlab
+import models_config
 
 
 class AppPredictor():
@@ -12,20 +13,30 @@ class AppPredictor():
         self.nn_model = self._load_model()
 
 
-
     def _loop(self):
-        received = []
+        received = {'word': [], 'time'}
         while(True):
-            word = self.queue.get(block=True)
-            if word == "BYE":
+            msg = self.queue.get(block=True)
+            if type(msg) == str:
                 sys.stderr.write("And the last one leaves\n")
                 return
-            # and magic happens here
 
+            received['word'].append(msg['word'])
+            received['timestamp'].append(msg['timestamp'])
+            current_sf = self._generate_sf(received)
+            
+            closest = self.nn_model.query(current_sf, verbose=False, k=1)
+            print "********************"
+            print "I predict the app is:", closest['reference_label']
+            print "********************"
 
     def _load_model(self):
         path = "models/" + self.user + "_apps_model"
         return graphlab.load_model("models/" + model_path)
+
+    def _generate_sf(self, received):
+        sf = graphlab.SFrame(received)
+        return self.get_sf_with_tfidf(sf)
 
 
     def start(self):
@@ -36,16 +47,25 @@ class AppPredictor():
 
 
     @classmethod
-    def generate_app_model(user):
-        data_path = "data/" + user + "_apps.csv"
-        apps_data_sf = graphlab.SFrame.read_csv(path)
+    def get_sf_with_tfidf(sf):
+        groupby_dict = {'words': agg.CONCAT('word'), 'timestamp_var': agg.VAR('timestamp')}
+        if "app" in sf.column_names():
+            groupby_dict['app': agg.SELECT_ONE('app')]
 
         import graphlab.aggregate as agg
-        grouped_sf = apps_data_sf.groupby('session_id',
-            {'words': agg.CONCAT('word'), 'timestamp_var': agg.VAR('timestamp'),  'app': agg.SELECT_ONE('app')})
+        grouped_sf = sf.groupby('session_id', groupby_dict)
         grouped_words_sf['bow'] = graphlab.text_analytics.count_words(grouped_words_sf['words'])
         grouped_words_sf['tf_idf'] = graphlab.text_analytics.tf_idf(grouped_words_sf['bow'])
 
-        m = graphlab.nearest_neighbors.create(grouped_words_sf, label='app', features=['tf_idf', 'timestamp_var'])
+        return grouped_words_sf
+
+    @classmethod
+    def generate_app_model(cls, user):
+        data_path = "data/" + user + "_apps.csv"
+        apps_data_sf = graphlab.SFrame.read_csv(path)
+
+        grouped_words_sf = get_sf_with_tfidf(apps_data_sf)
+
+        m = graphlab.nearest_neighbors.create(grouped_words_sf, label='app', features=models_config.apps_features)
         model_path = "models/" + self.user + "_apps_model"
         m.save()

@@ -66,22 +66,22 @@ class RequestHandler(BaseHTTPRequestHandler):
         sys.stderr.write(str(len(touches)) + " TOUCHES\n")
         noise_model = graphlab.boosted_trees_classifier.create(user_taps_sf,
                                                             target="noise",
-                                                            features=models_config.features,
+                                                            features=models_config.taps_features,
                                                             max_iterations = models_config.noise_max_iterations,
                                                             max_depth = models_config.noise_max_depth)
         type_model = graphlab.boosted_trees_classifier.create(not_noise,
                                                               target="type",
-                                                              features=models_config.features,
+                                                              features=models_config.taps_features,
                                                               max_iterations = models_config.type_max_iterations,
                                                               max_depth = models_config.type_max_depth)
         swipe_model = graphlab.boosted_trees_classifier.create(swipes,
                                                              target="action",
-                                                             features=models_config.features,
+                                                             features=models_config.taps_features,
                                                              max_iterations = models_config.swipe_max_iterations,
                                                              max_depth = models_config.swipe_max_depth)
         touch_model = graphlab.boosted_trees_classifier.create(touches,
                                                              target="action",
-                                                             features=models_config.features,
+                                                             features=models_config.taps_features,
                                                              max_iterations = models_config.touch_max_iterations,
                                                              max_depth = models_config.touch_max_depth)
 

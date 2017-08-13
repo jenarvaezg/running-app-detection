@@ -50,8 +50,8 @@ class Compressor():
                 for i in range(len(compressed)):
                     f.write(compressed[i] + "," + str(times[i]) + "," + self.app + "," + self.session_id + "\n")
         elif self.mode == "PREDICT_APPS":
-            for word in compressed:
-                self.app_predictor.queue.put(word)
+            for i in range(len(compressed)):
+                self.app_predictor.queue.put({'word': compressed[i], 'timestamp': times[i]})
 
     def _loop(self):
         n_noise = 0

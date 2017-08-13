@@ -11,8 +11,6 @@ class Monitor():
 
         self.tap_predictor_queue = tap_predictor.queue
         self.compressor_queue = tap_predictor.compressor.queue
-        """if tap_predictor.mode == "PREDICT_APPS":
-            self.app_predictor_queue = tap_predictor.compressor.app_predictor.queue"""
 
 
     def _loop(self):

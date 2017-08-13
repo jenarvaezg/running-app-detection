@@ -1,4 +1,4 @@
-features = [
+taps_features = [
     "n_accel",
 
     "accel_x_mean",
@@ -45,6 +45,12 @@ features = [
     "gyro_z_kurtosis",
     "gyro_z_diff",
 
+]
+
+
+apps_features = [
+    "tf_idf",
+    "timestamp_var",
 ]
 
 noise_max_iterations = 640
