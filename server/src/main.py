@@ -18,6 +18,7 @@ import config.models_config as models_config
 
 from workers.tap_predictor import TapPredictor
 from workers.monitor import Monitor
+from workers.app_predictor import AppPredictor
 
 
 models = {}
@@ -137,8 +138,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         elif self.path == "/predict_taps":
             self.body_to_prediction_pipeline(mode="PREDICT_TAPS")
         elif self.path == "/train_apps":
-            pass
-            # TODO maybe self.finish_app_training()
+            AppPredictor.generate_app_model(self.user)
         elif self.path == "/update_apps":
             self.body_to_prediction_pipeline(mode="UPDATE_APPS")
         elif self.path == "/predict_apps":

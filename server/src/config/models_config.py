@@ -51,6 +51,7 @@ taps_features = [
 apps_features = [
     "tf_idf",
     "timestamp_var",
+    "timestamp_std"
 ]
 
 noise_max_iterations = 640
