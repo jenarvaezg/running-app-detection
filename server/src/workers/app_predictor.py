@@ -1,42 +1,35 @@
 from Queue import Queue
 import threading
-
 import graphlab
-import config.models_config as models_config
+
+from config import models_config
 
 
 class AppPredictor():
 
-    def __init__(self, user):
+    def __init__(self, user, session_id):
         self.user = user
         self.queue = Queue(0)
+        self.session_id = session_id
         self.nn_model = self._load_model()
-
+        self.train_sf = self._get_training_sf(user)
 
     def _loop(self):
-        received = {'word': [], 'time': []}
+        received = {'word': [], 'timestamp': []}
         while(True):
             msg = self.queue.get(block=True)
             if type(msg) == str:
-                sys.stderr.write("And the last one leaves\n")
+                print "App predictor leaves"
                 return
 
             received['word'].append(msg['word'])
             received['timestamp'].append(msg['timestamp'])
             current_sf = self._generate_sf(received)
-
+            print current_sf['tf_idf']
             closest = self.nn_model.predict(current_sf)[0]
             print "********************"
-            print "I predict the app is:", closest['reference_label']
+            print "I predict the app is:", closest
             print "********************"
-
-    def _load_model(self):
-        path = "models/" + self.user + "_apps_model"
-        return graphlab.load_model("models/" + model_path)
-
-    def _generate_sf(self, received):
-        sf = graphlab.SFrame(received)
-        return self.get_sf_with_tfidf(sf)
 
 
     def start(self):
@@ -46,29 +39,55 @@ class AppPredictor():
         return t
 
 
+    def _load_model(self):
+        model_path = "models/" + self.user + "_apps_model"
+        return graphlab.load_model(model_path)
+
+
+
+    def _generate_sf(self, received):
+        received['session_id'] = [self.session_id for _ in range(len(received['word']))]
+        sf = graphlab.SFrame(received)
+        grouped_sf = self._get_grouped_sf(sf)
+        train_sf = self.train_sf.copy()
+        del train_sf['app']
+
+        corpus_sf = train_sf.append(grouped_sf)
+        corpus_sf['tf_idf'] = graphlab.text_analytics.tf_idf(corpus_sf['bow'])
+
+        return corpus_sf.tail(1)
+
+
     @classmethod
-    def get_sf_with_tfidf(cls, sf):
+    def generate_app_model(cls, user):
+        grouped_words_sf = cls._get_training_sf(user)
+        grouped_words_sf['tf_idf'] = graphlab.text_analytics.tf_idf(grouped_words_sf['bow'])
+
+        m = graphlab.classifier.create(grouped_words_sf, target='app', features=models_config.apps_features)
+        model_path = "models/" + user + "_apps_model"
+        m.save(model_path)
+
+
+    @classmethod
+    def _get_grouped_sf(cls, sf):
         import graphlab.aggregate as agg
         groupby_dict = {
-            'words': agg.CONCAT('word'),
-            'timestamp_var': agg.VAR('timestamp'),
-            'timestamp_std': agg.STD('timestamp')}
+        'words': agg.CONCAT('word'),
+        'timestamp_var': agg.VAR('timestamp'),
+        'timestamp_std': agg.STD('timestamp')}
         if "app" in sf.column_names():
             groupby_dict['app'] = agg.SELECT_ONE('app')
 
         grouped_words_sf = sf.groupby('session_id', groupby_dict)
         grouped_words_sf['bow'] = graphlab.text_analytics.count_words(grouped_words_sf['words'])
-        grouped_words_sf['tf_idf'] = graphlab.text_analytics.tf_idf(grouped_words_sf['bow'])
 
         return grouped_words_sf
 
     @classmethod
-    def generate_app_model(cls, user):
+    def _get_training_sf(cls, user):
         data_path = "data/" + user + "_apps.csv"
-        apps_data_sf = graphlab.SFrame.read_csv(data_path)
+        apps_data_sf = graphlab.SFrame.read_csv(data_path, verbose=False)
 
-        grouped_words_sf = cls.get_sf_with_tfidf(apps_data_sf)
+        grouped_words_sf = cls._get_grouped_sf(apps_data_sf)
 
-        m = graphlab.classifier.create(grouped_words_sf, target='app', features=models_config.apps_features)
-        model_path = "models/" + user + "_apps_model"
-        m.save(model_path)
+        return grouped_words_sf

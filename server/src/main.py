@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 from BaseHTTPServer import HTTPServer
 from BaseHTTPServer import BaseHTTPRequestHandler
 from SocketServer import ThreadingMixIn
@@ -29,7 +31,6 @@ class RequestHandler(BaseHTTPRequestHandler):
 
 
     taps_file_mutex = threading.Lock()
-    apps_file_mutex = threading.Lock()
 
     def get_msg(self, compressed=False):
         size = int(self.headers.get('Content-Length', 0))
@@ -110,12 +111,13 @@ class RequestHandler(BaseHTTPRequestHandler):
                 predictor.set_app(d['app'][0])
             sf = graphlab.SFrame(d)
             predictor.queue.put(sf)
+            
         print("*********************")
         print("Server WAITING, total = {} lines".format(i))
         print("*********")
         predictor.stop()
-        monitor.stop()
         print("Joined with predictor")
+        monitor.stop()
         return
 
     def do_POST(self):

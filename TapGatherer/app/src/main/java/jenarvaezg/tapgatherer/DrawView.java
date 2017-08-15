@@ -78,7 +78,7 @@ public class DrawView extends SurfaceView implements SurfaceHolder.Callback {
         Canvas canvas = holder.lockCanvas();
         canvas.drawColor(Color.BLACK);
         drawGrid(canvas);
-        if(random.nextInt() % 3 == 0){
+        if(random.nextInt() % 4 == 0){
             currentShape = new Arrow(canvas);
         }else{
             currentShape = new Circle(canvas);

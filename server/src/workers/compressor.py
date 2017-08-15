@@ -1,4 +1,4 @@
-from Queue import Queue
+from Queue import PriorityQueue as Queue
 import threading
 import random
 import os
@@ -13,7 +13,7 @@ from workers.app_predictor import AppPredictor
 class Compressor():
 
     MAX_CONSECUTIVE_NOISE = 10
-    MAX_CONSECUTIVE_NOT_NOISE = 30
+    MAX_CONSECUTIVE_NOT_NOISE = 25
     MAX_BLOCK_SIZE = 80
     SIDE_TRIM_SIZE = 5
 
@@ -22,10 +22,9 @@ class Compressor():
         self.user = user
         self.mode = mode
         self.queue = Queue(0)
-        self.lock = threading.Lock() # Maybe wont use
 
     def get_most_commons(self, block):
-        block = block[self.SIDE_TRIM_SIZE:-self.SIDE_TRIM_SIZE]
+        #block = block[self.SIDE_TRIM_SIZE:-self.SIDE_TRIM_SIZE]
         l = len(block)
 
         if l > Compressor.MAX_BLOCK_SIZE:
@@ -61,7 +60,7 @@ class Compressor():
         result = []
 
         while(True):
-            sf = self.queue.get(block=True)
+            sf = self.queue.get(block=True)[1]
             if type(sf) == str:
                 self._exit_operations()
                 return
@@ -96,18 +95,18 @@ class Compressor():
             self.app_predictor.queue.put("BYE")
             print("Compressor waiting for app predictor")
             self.app_predictor_t.join()
-        elif self.mode == "TRAIN_APPS":
+        elif self.mode == "UPDATE_APPS":
             print "Generating app model for user", self.user
             AppPredictor.generate_app_model(self.user)
             print "Model saved"
 
-        print "Compressor leaving"
+        print "Compressor leaving, mode was", self.mode
 
     def start(self):
         t = threading.Thread(target = self._loop)
         t.daemon = True
         t.start()
         if self.mode == "PREDICT_APPS":
-            self.app_predictor = AppPredictor(self.user)
+            self.app_predictor = AppPredictor(self.user, self.session_id)
             self.app_predictor_t = self.app_predictor.start()
         return t

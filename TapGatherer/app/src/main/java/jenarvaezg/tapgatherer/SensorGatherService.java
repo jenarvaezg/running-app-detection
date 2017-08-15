@@ -78,7 +78,8 @@ public class SensorGatherService extends IntentService implements SensorEventLis
                 }else if(trainingApps){
                     sendTrainAppsCommand();
                     trainingApps = false;
-                }else{
+                }
+                if(featureWorker != null){
                     featureWorker.stop();
                 }
             }else if(ACTION_TRAIN.equals(action) && "TAPS".equals(type)) {

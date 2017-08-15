@@ -95,8 +95,6 @@ public class MainActivity extends AppCompatActivity {
                 intent.setType("APPS");
                 startService(intent);
 
-                Log.d(TAG, "THIS SHOULD NOT APPEAR");
-
             }
 
             private void setupAppsDialog(String action) {

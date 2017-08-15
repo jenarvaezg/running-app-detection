@@ -15,9 +15,9 @@ class TapPredictor():
         self.swipe_model = models['swipe']
         self.mode = mode
         self.workers = []
-        self.NWORKERS = 2
+        self.NWORKERS = 3
         self.app = ""
-        self.noise_prediction_threshold = 0.3
+        self.noise_prediction_threshold = 0.35
 
 
     def set_app(self, app):
@@ -42,14 +42,14 @@ class TapPredictor():
                 else:
                     sf["prediction"] = self.touch_model.predict(sf)[0]
 
-            self.compressor.queue.put_nowait(sf)
+            self.compressor.queue.put_nowait((sf['seq_n'][0], sf))
 
 
     def stop(self):
-        for worker in self.workers:
+        for i in range(len(self.workers)):
             self.queue.put("BYE")
+        for worker in self.workers:
             worker.join()
-            print("Joined with tap worker")
         self.compressor_thread.join()
         print("Joined with compressor thread, tap predictor leaving")
         return
