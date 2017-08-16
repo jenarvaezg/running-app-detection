@@ -25,7 +25,7 @@ class AppPredictor():
             received['word'].append(msg['word'])
             received['timestamp'].append(msg['timestamp'])
             current_sf = self._generate_sf(received)
-            print current_sf['tf_idf']
+            print current_sf['words_tf_idf']
             closest = self.nn_model.predict(current_sf)[0]
             print "********************"
             print "I predict the app is:", closest
@@ -53,15 +53,29 @@ class AppPredictor():
         del train_sf['app']
 
         corpus_sf = train_sf.append(grouped_sf)
-        corpus_sf['tf_idf'] = graphlab.text_analytics.tf_idf(corpus_sf['bow'])
+        corpus_sf['words_tf_idf'] = graphlab.text_analytics.tf_idf(corpus_sf['bow'])
+        corpus_sf['normalized_tf_idf'] = corpus_sf.apply(AppPredictor._get_normalized_tf_idf)
 
         return corpus_sf.tail(1)
+
+
+    @staticmethod
+    def _get_normalized_tf_idf(sf):
+        n = len(sf['words'])
+        tf_idf_accum = {}
+
+        for key, value in sf['words_tf_idf'].iteritems():
+            tf_idf_accum[key] = value / n
+
+        return tf_idf_accum
 
 
     @classmethod
     def generate_app_model(cls, user):
         grouped_words_sf = cls._get_training_sf(user)
-        grouped_words_sf['tf_idf'] = graphlab.text_analytics.tf_idf(grouped_words_sf['bow'])
+        grouped_words_sf['words_tf_idf'] = graphlab.text_analytics.tf_idf(grouped_words_sf['bow'])
+        grouped_words_sf['normalized_tf_idf'] = grouped_words_sf.apply(AppPredictor._get_normalized_tf_idf)
+
 
         m = graphlab.classifier.create(grouped_words_sf, target='app', features=models_config.apps_features)
         model_path = "models/" + user + "_apps_model"

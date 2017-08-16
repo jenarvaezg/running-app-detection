@@ -58,7 +58,7 @@ class RequestHandler(BaseHTTPRequestHandler):
 
     def train_taps(self):
         path = "data/" + self.user + "_taps.csv"
-        user_taps_sf = graphlab.SFrame.read_csv(path)
+        user_taps_sf = graphlab.SFrame.read_csv(path, verbose=False)
         sys.stderr.write(str(len(user_taps_sf)) + " TOTAL\n")
         not_noise = user_taps_sf[user_taps_sf['noise'] == 0]
         sys.stderr.write(str(len(not_noise)) + " NOT_NOISE\n")
@@ -111,7 +111,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                 predictor.set_app(d['app'][0])
             sf = graphlab.SFrame(d)
             predictor.queue.put(sf)
-            
+
         print("*********************")
         print("Server WAITING, total = {} lines".format(i))
         print("*********")

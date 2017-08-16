@@ -49,7 +49,8 @@ taps_features = [
 
 
 apps_features = [
-    "tf_idf",
+    #"words_tf_idf",
+    "normalized_tf_idf",
     "timestamp_var",
     "timestamp_std"
 ]
