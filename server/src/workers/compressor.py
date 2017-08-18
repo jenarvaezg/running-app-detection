@@ -12,10 +12,9 @@ from workers.app_predictor import AppPredictor
 
 class Compressor():
 
-    MAX_CONSECUTIVE_NOISE = 10
+    MAX_CONSECUTIVE_NOISE = 15
     MAX_CONSECUTIVE_NOT_NOISE = 25
-    MAX_BLOCK_SIZE = 80
-    SIDE_TRIM_SIZE = 5
+    MAX_BLOCK_SIZE = 60
 
     def __init__(self, user, mode):
         self.session_id = ''.join(random.choice('0123456789ABCDEF') for i in range(16))
@@ -24,17 +23,25 @@ class Compressor():
         self.queue = Queue(0)
 
     def get_most_commons(self, block):
-        #block = block[self.SIDE_TRIM_SIZE:-self.SIDE_TRIM_SIZE]
         l = len(block)
 
         if l > Compressor.MAX_BLOCK_SIZE:
-            left, ltime = self.get_most_commons(block[:l/2])
-            right, rtime = self.get_most_commons(block[l/2:])
-            return (left + right, ltime + rtime)
+            left = self.get_most_commons(block[:l/2])
+            right = self.get_most_commons(block[l/2:])
+            return tuple(left[i] + right[i] for i in range(len(left)))
 
+	word_weights = {}
+	for e in block:
+		word_weights[e['word']] = word_weights.setdefault(e['word'], 0) + (1/e['probability_noise'])
+	
         words = [e['word'] for e in block]
         data = Counter(words)
-        return ([data.most_common(1)[0][0]], [block[l/2]["time"]])
+
+
+	print word_weights, data
+	most_common_word = max(word_weights, key=word_weights.get)
+
+        return ([most_common_word], [block[l/2]["time"]], [block[l/2]['probability_noise']])
 
     def pass_compressed(self, compressed, times):
         print("HEY I GOT", compressed, times)
@@ -57,14 +64,12 @@ class Compressor():
         n_not_noise = 0
         in_noise_block = True
         current_block = []
-        result = []
 
         while(True):
             sf = self.queue.get(block=True)[1]
             if type(sf) == str:
                 self._exit_operations()
                 return
-            # print(sf["prediction"], n_noise, n_not_noise, in_noise_block, current_block, result)
 
             if sf["prediction"][0] == "NOISE": # if we get noise
                 if in_noise_block: # and we are in a noise block
@@ -73,15 +78,13 @@ class Compressor():
                     continue # and keep reading
                 n_noise += 1 #otherwise we are in an event block, add to noise_counter
                 if n_noise >= Compressor.MAX_CONSECUTIVE_NOISE: # if we have enough consecutive noise
-                    compressed, times = self.get_most_commons(current_block) # get compressed
-                    result.extend(compressed) # add to compressed result
-                    print "HAD ", current_block, len(current_block)
+                    compressed, times, probability_noise = self.get_most_commons(current_block) # get compressed
                     self.pass_compressed(compressed, times) # pass compressed
                     in_noise_block = True # go back to being in a noise block
                     n_noise = n_not_noise = 0 # reset counters
                     current_block = [] # and reset current block
             else: # if we get something that is not noise
-                current_block.append({'word': sf["prediction"][0], 'time': int(sf["timestamp"][0])}) # add to posibly current block
+                current_block.append({'word': sf["prediction"][0], 'probability_noise': sf['probability_noise'][0], 'time': int(sf["timestamp"][0])}) # add to posibly current block
                 if in_noise_block: # if we are in a block of noise
                     n_not_noise += 1 # add to not_noise_counter
                     if n_not_noise >= Compressor.MAX_CONSECUTIVE_NOT_NOISE: # if we have enough consecutive not noise

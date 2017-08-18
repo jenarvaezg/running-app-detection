@@ -51,18 +51,22 @@ taps_features = [
 apps_features = [
     #"words_tf_idf",
     "normalized_tf_idf",
-    "timestamp_var",
-    "timestamp_std"
+    #"timestamp_var",
+    #"timestamp_std"
 ]
 
+#validation f1 = 0.9789
 noise_max_iterations = 640
-noise_max_depth = 4
+noise_max_depth = 8 #9 is 0.07% better
 
-type_max_iterations = 100 #160
-type_max_depth = 6
+#validation f1 = 0.9945
+type_max_iterations = 640
+type_max_depth = 5 #7 is 0.05% better
 
-swipe_max_iterations = 40
-swipe_max_depth = 6
+#validation f1 = 0.9956
+swipe_max_iterations = 160 #640 is 0.13% better
+swipe_max_depth = 7 #9 is 0.009% better
 
-touch_max_iterations = 300 #640
-touch_max_depth = 2
+#validation f1 = 0.9943
+touch_max_iterations = 160 #640 is 0.3% better
+touch_max_depth = 6 #7 is 0.1% better 

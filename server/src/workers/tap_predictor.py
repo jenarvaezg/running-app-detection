@@ -32,8 +32,8 @@ class TapPredictor():
                 self.compressor.queue.put_nowait(sf) # sf is actually a string
                 return
 
-            prob = self.noise_model.predict(sf, output_type="probability")[0]
-            if prob > self.noise_prediction_threshold: #noise
+            sf['probability_noise'] = self.noise_model.predict(sf, output_type="probability")
+            if sf['probability_noise'][0] > self.noise_prediction_threshold: #noise
                 sf["prediction"] = "NOISE"
             else:
                 e_type = self.type_model.predict(sf)[0]
