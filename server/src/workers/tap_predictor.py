@@ -15,9 +15,9 @@ class TapPredictor():
         self.swipe_model = models['swipe']
         self.mode = mode
         self.workers = []
-        self.NWORKERS = 3
+        self.NWORKERS = 4
         self.app = ""
-        self.noise_prediction_threshold = 0.35
+        self.noise_prediction_threshold = 0.375
 
 
     def set_app(self, app):

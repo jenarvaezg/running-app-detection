@@ -14,7 +14,7 @@ class Compressor():
 
     MAX_CONSECUTIVE_NOISE = 15
     MAX_CONSECUTIVE_NOT_NOISE = 25
-    MAX_BLOCK_SIZE = 60
+    MAX_BLOCK_SIZE = 70
 
     def __init__(self, user, mode):
         self.session_id = ''.join(random.choice('0123456789ABCDEF') for i in range(16))
@@ -30,21 +30,19 @@ class Compressor():
             right = self.get_most_commons(block[l/2:])
             return tuple(left[i] + right[i] for i in range(len(left)))
 
-	word_weights = {}
-	for e in block:
-		word_weights[e['word']] = word_weights.setdefault(e['word'], 0) + (1/e['probability_noise'])
-	
-        words = [e['word'] for e in block]
-        data = Counter(words)
+    	word_weights = {}
+    	for e in block:
+            word_weights[e['word']] = word_weights.setdefault(e['word'], 0) + (1/e['probability_noise'])
+            words = [e['word'] for e in block]
 
-
-	print word_weights, data
-	most_common_word = max(word_weights, key=word_weights.get)
+        counter = Counter(words)
+    	print word_weights, "\n", counter
+    	most_common_word = max(word_weights, key=word_weights.get)
 
         return ([most_common_word], [block[l/2]["time"]], [block[l/2]['probability_noise']])
 
     def pass_compressed(self, compressed, times):
-        print("HEY I GOT", compressed, times)
+        print("HEY I GOT", compressed)
         if self.mode == "PREDICT_TAPS":
             print "\n".join(compressed)
         elif self.mode == "UPDATE_APPS":

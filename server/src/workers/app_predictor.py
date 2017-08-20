@@ -83,17 +83,43 @@ class AppPredictor():
 
 
     @classmethod
-    def _get_grouped_sf(cls, sf):
-        import graphlab.aggregate as agg
-        groupby_dict = {
-        'words': agg.CONCAT('word'),
-        'timestamp_var': agg.VAR('timestamp'),
-        'timestamp_std': agg.STD('timestamp')}
-        if "app" in sf.column_names():
-            groupby_dict['app'] = agg.SELECT_ONE('app')
+    def _aggregate_by_session_id(cls, sf):
+        import numpy as np
+        out_sf = graphlab.SFrame()
 
-        grouped_words_sf = sf.groupby('session_id', groupby_dict)
+        has_app = "app" in sf.column_names()
+
+        for session_id in sf['session_id'].unique():
+            session_out_sf = graphlab.SFrame()
+            session_out_sf['session_id'] = [session_id]
+            words = []
+            time_diffs = []
+            sf_group = sf[sf['session_id'] == session_id]
+            n_events = len(sf_group)
+
+            for i in range(n_events -1, -1, -1):
+                this_sf = sf_group[i]
+                words.append(this_sf['word'])
+                if i != 0:
+                    time_diffs.append(this_sf['timestamp'] - sf_group[i-1]['timestamp'])
+
+            session_out_sf['time_diff_mean'] = [np.mean(time_diffs)]
+            session_out_sf['time_diff_var'] = [np.var(time_diffs)]
+            session_out_sf['words'] = [words]
+
+            if has_app:
+                session_out_sf['app'] = [sf_group['app'][0]]
+
+            out_sf = out_sf.append(session_out_sf)
+
+        return out_sf
+
+
+    @classmethod
+    def _get_grouped_sf(cls, sf):
+        grouped_words_sf = cls._aggregate_by_session_id(sf)
         grouped_words_sf['bow'] = graphlab.text_analytics.count_words(grouped_words_sf['words'])
+        grouped_words_sf['swipe_percentage'] = grouped_words_sf['bow'].apply(_get_swipe_percentage)
 
         return grouped_words_sf
 
@@ -105,3 +131,13 @@ class AppPredictor():
         grouped_words_sf = cls._get_grouped_sf(apps_data_sf)
 
         return grouped_words_sf
+
+
+def _get_swipe_percentage(bow):
+    n = 0
+    n_swipes = 0
+    for word, times in bow.iteritems():
+        n += times
+        if "->" in word:
+            n_swipes += times
+    return n_swipes / float(n)
