@@ -5,7 +5,7 @@ import os
 
 from time import time
 
-from collections import Counter
+#from collections import Counter
 
 from workers.app_predictor import AppPredictor
 
@@ -32,14 +32,14 @@ class Compressor():
 
     	word_weights = {}
     	for e in block:
-            word_weights[e['word']] = word_weights.setdefault(e['word'], 0) + (1/e['probability_noise'])
+            word_weights[e['word']] = word_weights.setdefault(e['word'], 0) + e['certainty']
             words = [e['word'] for e in block]
 
-        counter = Counter(words)
-    	print word_weights, "\n", counter
+        #counter = Counter(words)
+    	#print word_weights, "\n", counter
     	most_common_word = max(word_weights, key=word_weights.get)
 
-        return ([most_common_word], [block[l/2]["time"]], [block[l/2]['probability_noise']])
+        return ([most_common_word], [block[l/2]["time"]], [block[l/2]['certainty']])
 
     def pass_compressed(self, compressed, times):
         print("HEY I GOT", compressed)
@@ -76,13 +76,13 @@ class Compressor():
                     continue # and keep reading
                 n_noise += 1 #otherwise we are in an event block, add to noise_counter
                 if n_noise >= Compressor.MAX_CONSECUTIVE_NOISE: # if we have enough consecutive noise
-                    compressed, times, probability_noise = self.get_most_commons(current_block) # get compressed
+                    compressed, times, certainty = self.get_most_commons(current_block) # get compressed
                     self.pass_compressed(compressed, times) # pass compressed
                     in_noise_block = True # go back to being in a noise block
                     n_noise = n_not_noise = 0 # reset counters
                     current_block = [] # and reset current block
             else: # if we get something that is not noise
-                current_block.append({'word': sf["prediction"][0], 'probability_noise': sf['probability_noise'][0], 'time': int(sf["timestamp"][0])}) # add to posibly current block
+                current_block.append({'word': sf["prediction"][0], 'certainty': sf['certainty'][0], 'time': int(sf["timestamp"][0])}) # add to posibly current block
                 if in_noise_block: # if we are in a block of noise
                     n_not_noise += 1 # add to not_noise_counter
                     if n_not_noise >= Compressor.MAX_CONSECUTIVE_NOT_NOISE: # if we have enough consecutive not noise

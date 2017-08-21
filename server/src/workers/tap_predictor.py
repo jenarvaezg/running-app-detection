@@ -17,7 +17,7 @@ class TapPredictor():
         self.workers = []
         self.NWORKERS = 4
         self.app = ""
-        self.noise_prediction_threshold = 0.375
+        self.noise_prediction_threshold = 0.5
 
 
     def set_app(self, app):
@@ -32,15 +32,18 @@ class TapPredictor():
                 self.compressor.queue.put_nowait(sf) # sf is actually a string
                 return
 
-            sf['probability_noise'] = self.noise_model.predict(sf, output_type="probability")
-            if sf['probability_noise'][0] > self.noise_prediction_threshold: #noise
+            probability_noise = self.noise_model.predict(sf, output_type="probability")[0]
+            if probability_noise > self.noise_prediction_threshold: #noise
                 sf["prediction"] = "NOISE"
             else:
-                e_type = self.type_model.predict(sf)[0]
-                if e_type == "SWIPE":
+                probability_touch = self.type_model.predict(sf, output_type="probability")[0]
+                if probability_touch < 0.5:
                     sf["prediction"] = self.swipe_model.predict(sf)[0]
                 else:
                     sf["prediction"] = self.touch_model.predict(sf)[0]
+	        
+		type_certainty = probability_touch if probability_touch > 0.5 else 1 - probability_touch
+                sf['certainty'] = [(1-probability_noise) + type_certainty]
 
             self.compressor.queue.put_nowait((sf['seq_n'][0], sf))
 
