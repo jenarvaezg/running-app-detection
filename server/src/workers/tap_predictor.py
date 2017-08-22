@@ -1,14 +1,17 @@
 from Queue import Queue
 import threading
 import sys
+import graphlab
 
+import config.models_config as models_config
 from workers.compressor import Compressor
 
 class TapPredictor():
 
-    def __init__(self, user, mode, models):
+    def __init__(self, user, mode):
         self.user = user
         self.queue = Queue(0)
+        models = self._get_models(user)
         self.noise_model = models['noise']
         self.type_model = models['type']
         self.touch_model = models['touch']
@@ -41,9 +44,9 @@ class TapPredictor():
                     sf["prediction"] = self.swipe_model.predict(sf)[0]
                 else:
                     sf["prediction"] = self.touch_model.predict(sf)[0]
-	        
-		type_certainty = probability_touch if probability_touch > 0.5 else 1 - probability_touch
-                sf['certainty'] = [(1-probability_noise) + type_certainty]
+
+		    type_certainty = probability_touch if probability_touch > 0.5 else 1 - probability_touch
+            sf['certainty'] = [(1-probability_noise) + type_certainty]
 
             self.compressor.queue.put_nowait((sf['seq_n'][0], sf))
 
@@ -67,3 +70,60 @@ class TapPredictor():
         self.compressor = Compressor(self.user, self.mode)
         self.compressor_thread = self.compressor.start()
         return self
+
+    @classmethod
+    def generate_tap_model(cls, user):
+        path = "data/" + user + "_taps.csv"
+        user_taps_sf = graphlab.SFrame.read_csv(path, verbose=False)
+        print len(user_taps_sf), "TOTAL"
+        not_noise = user_taps_sf[user_taps_sf['noise'] == 0]
+        print len(not_noise), "NOT_NOISE"
+        swipes = not_noise[not_noise['type'] == "SWIPE"]
+        print len(swipes), "SWIPES"
+        touches = not_noise[not_noise['type'] == "TOUCH"]
+        print len(touches), "TOUCHES"
+        noise_model = graphlab.boosted_trees_classifier.create(user_taps_sf,
+                                                            target="noise",
+                                                            features=models_config.taps_features,
+                                                            max_iterations = models_config.noise_max_iterations,
+                                                            max_depth = models_config.noise_max_depth,
+                                                            validation_set=None)
+        type_model = graphlab.boosted_trees_classifier.create(not_noise,
+                                                              target="type",
+                                                              features=models_config.taps_features,
+                                                              max_iterations = models_config.type_max_iterations,
+                                                              max_depth = models_config.type_max_depth,
+                                                              validation_set=None)
+        swipe_model = graphlab.boosted_trees_classifier.create(swipes,
+                                                             target="action",
+                                                             features=models_config.taps_features,
+                                                             max_iterations = models_config.swipe_max_iterations,
+                                                             max_depth = models_config.swipe_max_depth,
+                                                             validation_set=None)
+        touch_model = graphlab.boosted_trees_classifier.create(touches,
+                                                             target="action",
+                                                             features=models_config.taps_features,
+                                                             max_iterations = models_config.touch_max_iterations,
+                                                             max_depth = models_config.touch_max_depth,
+                                                             validation_set=None)
+
+        noise_model.save("models/" + user + "_noise_model")
+        type_model.save("models/" + user + "_type_model")
+        swipe_model.save("models/" + user + "_swipe_model")
+        touch_model.save("models/" + user + "_touch_model")
+
+    def _get_models(self, user):
+        import os
+
+        all_models = os.listdir("models")
+
+        models = {}
+
+    	for model_path in all_models:
+            if user in model_path:
+        		model = graphlab.load_model("models/" + model_path)
+        		spl = model_path.split("_")
+        		model_type = spl[1]
+        		models[model_type] = model
+
+        return models
