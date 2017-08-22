@@ -206,6 +206,9 @@ public class SensorGatherService extends IntentService implements SensorEventLis
                 EventWindowFeatures[] features = extractTrainFeatures(type, action,
                         before, during, after);
                 //send features via network
+                if(features.length == 0){
+                    return;
+                }
                 StringBuilder sb = new StringBuilder();
                 sb.append(EventWindowFeatures.getTrainingTapsCSVHeader());
                 for(EventWindowFeatures feature: features){
@@ -226,6 +229,9 @@ public class SensorGatherService extends IntentService implements SensorEventLis
 
         Integer WINDOW_SIZE = 20;
         Log.d(TAG, "BEFORE: " + Integer.toString(before.size())  + " DURING: " + Integer.toString(during.size()) +  " AFTER: " + Integer.toString(after.size()));
+        if(during.size() == 0){
+            return new EventWindowFeatures[0];
+        }
         Integer startDuringPos = before.size();
         Integer endDuringPos = startDuringPos + during.size();
         SensorEventData[] events = new SensorEventData[endDuringPos + after.size()];
@@ -233,8 +239,13 @@ public class SensorGatherService extends IntentService implements SensorEventLis
         System.arraycopy(during.toArray(new SensorEventData[during.size()]), 0, events, startDuringPos,
                 endDuringPos - startDuringPos);
         System.arraycopy(after.toArray(new SensorEventData[after.size()]), 0, events, endDuringPos, after.size());
-        EventWindowFeatures[] features = new EventWindowFeatures[events.length - WINDOW_SIZE];
-        for(int i = 0; i < events.length - WINDOW_SIZE; i++){
+        Integer nFeatures = events.length - WINDOW_SIZE;
+        if(nFeatures < 0){
+            nFeatures = 0;
+        }
+        EventWindowFeatures[] features = new EventWindowFeatures[nFeatures];
+
+        for(int i = 0; i < nFeatures; i++){
             String when = i + WINDOW_SIZE - 1 < startDuringPos ? "BEFORE" : i + WINDOW_SIZE - 1 <
                     endDuringPos ? "DURING" : "AFTER";
             SensorEventData[] thisWindowEvents = Arrays.copyOfRange(events, i, i+WINDOW_SIZE);

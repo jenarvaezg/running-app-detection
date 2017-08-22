@@ -38,10 +38,10 @@ public class Arrow implements Shape{
         this.width = vertical ? size.x / 10f : size.y / 12f;
 
         if(vertical){
-            this.x =  (random.nextFloat() * (size.x - 10) + 10);
+            this.x =  (random.nextFloat() * (size.x - 20) + 20);
             this.y = size.y * 0.125f;
         }else{
-            this.y = (random.nextFloat() * (size.y - 10) + 10);
+            this.y = (random.nextFloat() * (size.y - 20) + 20);
             this.x = size.x * 0.125f;
         }
 

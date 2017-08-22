@@ -30,7 +30,7 @@ public class MainActivity extends AppCompatActivity {
     DrawView drawView;
 
     private static final String TAG = "MAIN";
-    private static final Long uptimestamp =  System.currentTimeMillis() - SystemClock.uptimeMillis();
+    private static Long uptimestamp =  System.currentTimeMillis() - SystemClock.uptimeMillis();
     private static Integer nActions = 0;
     private static Switch startStopSwitch;
     static Boolean started = false;
@@ -197,6 +197,7 @@ public class MainActivity extends AppCompatActivity {
             startStopSwitch.setChecked(false);
         }
         Log.d(TAG, "RESUMING! " + Boolean.toString(started));
+        uptimestamp =  System.currentTimeMillis() - SystemClock.uptimeMillis();
 
     }
 
