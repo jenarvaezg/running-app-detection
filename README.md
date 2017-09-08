@@ -12,4 +12,4 @@ With each upgrade of the Android OS, it has been clear that user’s privacy is 
 
 ## Training and prediction flow
 
-![flow](https://lh5.googleusercontent.com/RgvnjVAZywFWoeVgWNCDcZgb07q3J63w8DVQZgoycGrDSkQ1tZEuxJDuDatHNzDcSvEulcKvce7kvzM=w1920-h961)
+![flow](images/flow.png)
