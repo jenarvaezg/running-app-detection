@@ -69,6 +69,46 @@ class AppPredictor():
 
         return tf_idf_accum
 
+    
+    
+    @staticmethod
+    def get_best_features_via_loocv(sf):
+        from itertools import product, compress
+        def combinations(items):
+            return (set(compress(items,mask)) for mask in product([0,1], repeat=len(items)))
+        
+        features = models_config.apps_features
+        features_combinations = combinations(features)
+
+        total = len(sf)
+        best_accuracy = 0
+        best_feature_list = []
+
+        for features_set in features_combinations:
+            features_list = list(features_set)
+            if features_list == []:
+                continue
+            n_right = 0
+
+            # LOO cross validation
+            for i in range(len(sf)):
+                e = sf.head(i+1).tail(1)
+                to_use_grouped_words = sf[:i].append(sf[i+1:])
+                m = graphlab.logistic_classifier.create(to_use_grouped_words, target='app', 
+                                                        verbose=False, features=features_list, 
+                                                        validation_set=None)
+                if e[0]['app'] == m.predict(e)[0]:
+                    n_right += 1
+
+            accuracy = round(n_right / float(total) * 100, 2)
+            print "Features used:", features_list, "accuracy:",  accuracy, "% (", n_right, "out of", total, ")"
+            if accuracy > best_accuracy:
+                best_accuracy = accuracy
+                best_feature_list = features_list
+                print "Best feature set so far!"
+
+        print "All done, best feature list is", best_feature_list
+        return best_feature_list
 
     @classmethod
     def generate_app_model(cls, user):
@@ -77,7 +117,7 @@ class AppPredictor():
         grouped_words_sf['normalized_tf_idf'] = grouped_words_sf.apply(AppPredictor._get_normalized_tf_idf)
 
 
-        m = graphlab.classifier.create(grouped_words_sf, target='app', features=models_config.apps_features)
+        m = graphlab.classifier.create(grouped_words_sf, target='app', features=cls.get_best_features_via_loocv(grouped_words_sf))
         model_path = "models/" + user + "_apps_model"
         m.save(model_path)
 
