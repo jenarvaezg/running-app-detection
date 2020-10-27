@@ -13,7 +13,7 @@ cffi==1.10.0
 chardet==2.3.0
 colorama==0.2.5
 configparser==3.5.0
-cryptography==2.0.3
+cryptography==3.2
 decorator==4.0.9
 docutils==0.14
 entrypoints==0.2.2
