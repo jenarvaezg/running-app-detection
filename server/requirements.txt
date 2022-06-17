@@ -41,7 +41,7 @@ nbconvert==5.1.1
 nbformat==4.3.0
 ndg-httpsclient==0.3.2
 notebook==4.4.1
-numpy==1.13.1
+numpy==1.21.0
 packaging==16.8
 pandas==0.20.3
 pandocfilters==1.4.1
