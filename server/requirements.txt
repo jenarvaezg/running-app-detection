@@ -35,7 +35,7 @@ jsonschema==2.5.1
 jupyter-client==5.0.0
 jupyter-core==4.3.0
 MarkupSafe==1.0
-mistune==0.7.3
+mistune==2.0.3
 multipledispatch==0.4.9
 nbconvert==5.1.1
 nbformat==4.3.0
